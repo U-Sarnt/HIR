@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reporte ARP - {{ subnet }}</title>
+  <style>
+    body {
+      background-color: #111;
+      color: #eee;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 24px;
+    }
+    .card {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    header {
+      background-color: #ff6600;
+      color: #111;
+      padding: 16px;
+      border-radius: 6px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.8em;
+    }
+    .meta {
+      margin-top: 8px;
+      font-size: 0.95em;
+    }
+    section {
+      margin-top: 20px;
+      background-color: #1a1a1a;
+      border-radius: 6px;
+      padding: 15px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #333;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #333;
+      color: #ff6600;
+    }
+    tr:nth-child(even) { background-color: #222; }
+    tr:nth-child(odd)  { background-color: #1a1a1a; }
+    .empty-state {
+      margin: 0;
+      color: #ddd;
+    }
+    footer {
+      margin-top: 30px;
+      text-align: right;
+      color: #777;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <header>
+      <h1>Reporte ARP para {{ subnet }}</h1>
+      <div class="meta">Generado: {{ timestamp }}</div>
+    </header>
+
+    <section>
+      {% if devices %}
+      <table>
+        <thead>
+          <tr>
+            <th>IP</th>
+            <th>MAC</th>
+            <th>Fabricante</th>
+            <th>Sistema operativo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for device in devices %}
+          <tr>
+            <td>{{ device.ip }}</td>
+            <td>{{ device.mac }}</td>
+            <td>{{ device.vendor|default('Desconocido', true) }}</td>
+            <td>{{ device.os|default('Desconocido', true) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty-state">No se encontraron dispositivos para la subred indicada.</p>
+      {% endif %}
+    </section>
+
+    <footer>HIR</footer>
+  </div>
+</body>
+</html>
