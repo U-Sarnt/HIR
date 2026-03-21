@@ -16,7 +16,7 @@ def test_render_html_arp_report_has_complete_content(tmp_path):
                     "ip": "192.168.1.10",
                     "mac": "aa:bb:cc:dd:ee:ff",
                     "vendor": "Test Vendor",
-                    "os": "Linux/Unix",
+                    "os": "Posible Linux/Unix (heurístico)",
                 }
             ],
         },
@@ -28,9 +28,11 @@ def test_render_html_arp_report_has_complete_content(tmp_path):
 
     assert "<title>Reporte ARP - 192.168.1.0/24</title>" in html
     assert "Generado:" in html
+    assert "Sistema operativo estimado" in html
+    assert "estimación heurística" in html
     assert "192.168.1.10" in html
     assert "Test Vendor" in html
-    assert "Linux/Unix" in html
+    assert "Posible Linux/Unix (heurístico)" in html
     assert "resto de tu HTML" not in html
     assert "{{" not in html
     assert "{%" not in html
@@ -46,6 +48,27 @@ def test_render_html_arp_report_shows_empty_message(tmp_path):
     html = Path(out_path).read_text(encoding="utf-8")
 
     assert "No se encontraron dispositivos para la subred indicada." in html
+
+
+def test_render_html_arp_report_defaults_missing_os_to_insufficient_data(tmp_path):
+    out_path = render_html(
+        {
+            "subnet": "192.168.1.0/24",
+            "devices": [
+                {
+                    "ip": "192.168.1.20",
+                    "mac": "aa:bb:cc:dd:ee:00",
+                    "vendor": "Test Vendor",
+                }
+            ],
+        },
+        base_filename="arp_report_no_os",
+        directory=str(tmp_path),
+    )
+
+    html = Path(out_path).read_text(encoding="utf-8")
+
+    assert "Sin datos suficientes" in html
 
 
 def test_render_html_traceroute_template_does_not_depend_on_cwd(tmp_path, monkeypatch):

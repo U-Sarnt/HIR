@@ -61,7 +61,7 @@ def load_oui_database(path: str = None) -> bool:
     return True
 
 def os_fingerprint_nmap(ip: str) -> str:
-    """Detecta SO usando nmap -O y --osscan-guess."""
+    """Intenta estimar el SO usando nmap -O y --osscan-guess."""
     res = subprocess.run(
         ['nmap','-O','--osscan-guess','-Pn',ip],
         capture_output=True, text=True
@@ -71,7 +71,7 @@ def os_fingerprint_nmap(ip: str) -> str:
 
 
 def os_fingerprint_scapy(ip: str, timeout: float = 1.0) -> str:
-    """Envía probes TCP (SYN y Xmas) con Scapy para inferir OS."""
+    """Envía probes TCP con Scapy para una estimación heurística de SO."""
     from scapy.all import IP, TCP, sr1
     # SYN probe
     syn = IP(dst=ip)/TCP(dport=80, flags='S')
@@ -87,7 +87,7 @@ def os_fingerprint_scapy(ip: str, timeout: float = 1.0) -> str:
     return 'Desconocido'
 
 def os_fingerprint_ttl(ip: str) -> str:
-    """Analiza TTL mínimo de un ping para conjeturar SO."""
+    """Analiza el TTL de un ping para una conjetura simple de SO."""
     proc = subprocess.run(
         ['ping', '-c', '1', '-W', '1', ip],
         capture_output=True, text=True
@@ -100,7 +100,7 @@ def os_fingerprint_ttl(ip: str) -> str:
     return 'Desconocido'
 
 def os_fingerprint_snmp(ip: str) -> str:
-    """Consulta SNMPv2/v3 (sin credenciales) para extraer SysDescr."""
+    """Intenta extraer una pista de SO a partir de SysDescr vía SNMP."""
     try:
         import nmap
         nm = nmap.PortScanner()
@@ -114,7 +114,7 @@ def os_fingerprint_snmp(ip: str) -> str:
     return 'Desconocido'
 
 def hybrid_os_fingerprint(ip: str) -> str:
-    """Cascada: Nmap → Scapy → TTL → SNMP para >95% de precisión."""
+    """Devuelve la primera estimación heurística disponible de SO o 'Desconocido'."""
     for fn in (os_fingerprint_nmap,
                os_fingerprint_scapy,
                os_fingerprint_ttl,

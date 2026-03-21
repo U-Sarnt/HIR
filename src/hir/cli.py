@@ -18,6 +18,12 @@ except ImportError:
 
 console = Console()
 
+
+def _format_os_guess(raw_os: str | None) -> str:
+    if not raw_os or raw_os == "Desconocido":
+        return "Sin datos suficientes"
+    return f"Posible {raw_os} (heurístico)"
+
 def _prompt_int(
     message: str,
     default: int | None = None,
@@ -197,7 +203,7 @@ def cmd_traceroute():
     console.print()
 
 def cmd_map():
-    """Realiza ARP scan + OS fingerprint y muestra resultado en console/json/html."""
+    """Realiza ARP scan y muestra una estimación heurística de SO."""
     host_subnet = _prompt_required_text("Rango/Subred (ej. 192.168.1.0/24) » ", "Rango/Subred")
     if host_subnet is None:
         return
@@ -218,14 +224,14 @@ def cmd_map():
         console.print(f"[red]Error ARP scan:[/] {e}")
         return
 
-    # OS fingerprint para cada host usando el método híbrido
+    # Estimación heurística de SO para cada host
     for dev in devices:
         # Vendor lookup
         dev['vendor'] = get_vendor_from_mac(dev['mac'])
         try:
-            dev['os'] = hybrid_os_fingerprint(dev['ip'])
+            dev['os'] = _format_os_guess(hybrid_os_fingerprint(dev['ip']))
         except Exception:
-            dev['os'] = 'Desconocido'
+            dev['os'] = _format_os_guess(None)
     
     data = {"subnet": host_subnet, "devices": devices}
 
@@ -233,8 +239,9 @@ def cmd_map():
     if fmt == "console":
         print(" ")
         console.print(f"[bold]Dispositivos encontrados en {host_subnet}:[/]")
+        console.print("[dim]El sistema operativo mostrado es una estimación heurística basada en las señales disponibles.[/]")
         print(" ")
-        console.print("IP               MAC                Vendor         OS")
+        console.print("IP               MAC                Vendor         SO estimado")
         for d in devices:
             console.print(f"{d['ip']:<16} {d['mac']:<18} {d['vendor']:<13} {d['os']}")
     elif fmt == "json":

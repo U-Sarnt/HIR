@@ -55,6 +55,11 @@
       margin: 0;
       color: #ddd;
     }
+    .note {
+      margin: 12px 0 0;
+      color: #bbb;
+      font-size: 0.95em;
+    }
     footer {
       margin-top: 30px;
       text-align: right;
@@ -78,7 +83,7 @@
             <th>IP</th>
             <th>MAC</th>
             <th>Fabricante</th>
-            <th>Sistema operativo</th>
+            <th>Sistema operativo estimado</th>
           </tr>
         </thead>
         <tbody>
@@ -87,11 +92,12 @@
             <td>{{ device.ip }}</td>
             <td>{{ device.mac }}</td>
             <td>{{ device.vendor|default('Desconocido', true) }}</td>
-            <td>{{ device.os|default('Desconocido', true) }}</td>
+            <td>{{ device.os|default('Sin datos suficientes', true) }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
+      <p class="note">El sistema operativo mostrado es una estimación heurística y puede no coincidir con el host real.</p>
       {% else %}
       <p class="empty-state">No se encontraron dispositivos para la subred indicada.</p>
       {% endif %}
