@@ -1,260 +1,346 @@
-import sys, time, os, subprocess
-from datetime import datetime
-from rich.console import Console
-from rich.panel import Panel
-from prompt_toolkit import prompt
+"""Public Click-based CLI for the validated Python surface of HIR."""
+
+from __future__ import annotations
+
+import json
+import math
+from pathlib import Path
+from typing import Any, Sequence
+
+import click
+
 from hir.core.network import enhanced_arp_scan, get_vendor_from_mac, hybrid_os_fingerprint
-from hir.core.ping import build_ping_command, parse_ping_line
+from hir.core.ping import ping_host
 from hir.core.traceroute import traceroute_host
-from hir.output.json import dump_json
 from hir.output.html import render_html
+from hir.output.json import dump_json
 
-
-try:
-    from hir_ext import fast_ping, fast_traceroute
-except ImportError:
-    fast_ping = None
-    fast_traceroute = None
-
-console = Console()
+_HELP_CONTEXT = {"help_option_names": ["-h", "--help"]}
 
 
 def _format_os_guess(raw_os: str | None) -> str:
+    """Return an honest user-facing OS label for heuristic fingerprints."""
     if not raw_os or raw_os == "Desconocido":
         return "Sin datos suficientes"
     return f"Posible {raw_os} (heurístico)"
 
-def _prompt_int(
-    message: str,
-    default: int | None = None,
-    empty_value: int | None = None,
-    empty_hint: str | None = None,
-    minimum: int | None = None,
-) -> int | None:
-    """Lee enteros de forma segura y evita tracebacks por entradas triviales inválidas."""
-    while True:
-        raw = prompt(message).strip()
-        if raw == "":
-            return default if default is not None else empty_value
 
-        try:
-            value = int(raw)
-        except ValueError:
-            hint = ""
-            if default is not None:
-                hint = " Pulsa Enter para usar el valor por defecto."
-            elif empty_hint:
-                hint = f" Pulsa Enter para {empty_hint}."
-            console.print(f"[red]Entrada no válida '{raw}'. Introduce un número entero.{hint}[/]")
-            continue
-
-        if minimum is not None and value < minimum:
-            console.print(
-                f"[red]Entrada no válida '{raw}'. Introduce un número entero mayor o igual que {minimum}.[/]"
-            )
-            continue
-
-        return value
+def _slugify(value: str) -> str:
+    safe = "".join(char if char.isalnum() else "_" for char in value.strip())
+    return safe.strip("_") or "report"
 
 
-def _prompt_required_text(message: str, field_name: str) -> str | None:
-    value = prompt(message).strip()
-    if value:
-        return value
+def _export_report(
+    data: dict[str, Any],
+    output_format: str,
+    base_filename: str,
+    output_dir: Path | None = None,
+) -> str | None:
+    """Export report data through the existing JSON or HTML backends."""
+    if output_format == "console":
+        return None
 
-    console.print(f"[red]{field_name} no puede estar vacío.[/]")
-    console.print()
-    return None
+    if output_format == "json":
+        directory = str(output_dir) if output_dir is not None else "results/json"
+        return dump_json(data, base_filename=base_filename, directory=directory)
+
+    directory = str(output_dir) if output_dir is not None else "results/html"
+    return render_html(data, base_filename=base_filename, directory=directory)
 
 
-def _prompt_output_format() -> str:
-    fmt_input = prompt("Formato (console[c]/json[j]/html[h]) » ").strip().lower()
-    fmt = {
-        "c": "console",
-        "console": "console",
-        "j": "json",
-        "json": "json",
-        "h": "html",
-        "html": "html",
-    }.get(fmt_input)
-    if fmt is None:
-        console.print(f"[red]Formato no válido '{fmt_input}', usando 'console' por defecto[/]")
-        return "console"
-    return fmt
+def _format_rtt(value: float) -> str:
+    if math.isnan(value):
+        return "n/a"
+    return f"{value:.2f} ms"
 
-def splash():
-    console.clear()
-    console.print(Panel.fit("[bold cyan]HIR – Herramienta para Ingenieros de Redes[/]"), justify="center")
-    with console.status("[green]Cargando módulos…[/]", spinner="dots"):
-        time.sleep(0.5)
-    console.print()
 
-def menu_loop():
-    while True:
-        console.print("[bold]Menú de opciones principales:[/]")
-        console.print("  [green]1)[/] Ping      [green]2)[/] Traceroute      [green]clear[/] (Limpia)")
-        console.print("  [green]3)[/] ARP_Oscan [green]0)[/] Salir")
-        opt = prompt("Selecciona opción » ").strip().lower()
+def _validate_export_options(output_format: str, output_dir: Path | None) -> None:
+    if output_format == "console" and output_dir is not None:
+        raise click.UsageError("--output-dir is only valid when exporting JSON or HTML.")
 
-        if opt in ("0", "q"):
-            console.print("👋 ¡Hasta luego!")
-            sys.exit(0)
 
-        if opt == "clear":
-            # Usar clear de sistema para limpiar todo el buffer visible
-            os.system("clear")
-            continue
+def _is_privilege_error(exc: BaseException) -> bool:
+    if isinstance(exc, PermissionError):
+        return True
 
-        if opt == "1":
-            cmd_ping()
-        elif opt == "2":
-            cmd_traceroute()
-        elif opt == "3":
-            cmd_map()
-        else:
-            console.print("[red]Opción no válida[/]\n")
+    if isinstance(exc, OSError) and exc.errno in {1, 13}:
+        return True
 
-def cmd_ping():
-    """Ejecuta ping en tiempo real, soporta Ctrl+C y modo continuo."""
-    host = _prompt_required_text("Host/IP » ", "Host/IP")
-    if host is None:
-        return
-
-    count = _prompt_int(
-        "Paquetes (4) / Enter para continuo sin fin » ",
-        empty_value=None,
-        empty_hint="activar el modo continuo",
-        minimum=1,
+    message = str(exc).lower()
+    return any(
+        hint in message
+        for hint in (
+            "operation not permitted",
+            "permission denied",
+            "not permitted",
+            "cannot set filter",
+        )
     )
-    timeout = _prompt_int("Timeout (2s) » ", default=2, minimum=1)
 
-    try:
-        cmd = build_ping_command(host, count=count, timeout=timeout)
-    except ValueError as e:
-        console.print(f"[red]ERROR:[/] {e}")
-        console.print()
-        return
 
-    modo = "continuo" if count is None else f"{count} paquetes"    
-    print(" ")
-    console.print(f":satellite: Ping a [bold]{host}[/] - {modo}, timeout: {timeout}s", style="cyan")
-    console.print("TTL    Tipo    Tiempo")
+def _build_ping_report(host: str, count: int, timeout: int) -> dict[str, Any]:
+    rtt_values = ping_host(host, count=count, timeout=timeout)
+    summary: dict[str, Any] = {
+        "host": host,
+        "count": count,
+        "timeout": timeout,
+        "rtt_ms": rtt_values,
+        "received": len(rtt_values),
+    }
 
-    # Ejecuta ping y captura interrupción
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    error_lines = []
-    try:
-        for raw in proc.stdout or ():
-            reply = parse_ping_line(raw)
-            if reply is None:
-                line = raw.strip()
-                if line:
-                    error_lines.append(line)
-                continue
-
-            ttl = "-" if reply.ttl is None else str(reply.ttl)
-            tiempo = reply.time_text or "-"
-            console.print(f"[magenta]{ttl:<6}[/] [yellow]ICMP  [/]  {tiempo} ms")
-    except KeyboardInterrupt:
-        # Interrupción del usuario
-        console.print("\n[bold red]Ping interrumpido por usuario. Volviendo al menú...[/]")
-        proc.terminate()
-        proc.wait()
-        console.print()
-        return
-
-    returncode = proc.wait()
-    if returncode != 0:
-        detail = f": {error_lines[-1]}" if error_lines else ""
-        console.print(f"[red]ERROR:[/] ping falló ({host}){detail}")
-    console.print()
-
-def cmd_traceroute():
-    host = _prompt_required_text("Host/IP » ", "Host/IP")
-    if host is None:
-        return
-
-    max_hops = _prompt_int("Hops (30) » ", default=30, minimum=1)
-    timeout = _prompt_int("Timeout (2s) » ", default=2, minimum=1)
-    fmt = _prompt_output_format()
-
-    fn = fast_traceroute or traceroute_host
-    try:
-        hops = fn(host, max_hops, timeout)
-    except Exception as e:
-        console.print(f"[red]ERROR:[/] {e}")
-        console.print()
-        return
-
-    data = {"host": host, "hops": hops}
-
-    if fmt == "console":
-        print(" ")
-        console.print(f"[bold]Traceroute a {host}:[/]")
-        for hop, ip, rtt in hops:            
-            console.print(f"[{hop:02d}] {ip} — {rtt} ms")
-    elif fmt == "json":
-        out = dump_json(data, base_filename=f"{host}_tr")
-        console.print(f"[green]JSON >> {out}[/]")
+    if rtt_values:
+        summary["min_ms"] = min(rtt_values)
+        summary["avg_ms"] = sum(rtt_values) / len(rtt_values)
+        summary["max_ms"] = max(rtt_values)
     else:
-        out = render_html(data, base_filename=f"{host}_tr")
-        console.print(f"[green]HTML >> {out}[/]")
+        summary["min_ms"] = None
+        summary["avg_ms"] = None
+        summary["max_ms"] = None
 
-    console.print()
+    return summary
 
-def cmd_map():
-    """Realiza ARP scan y muestra una estimación heurística de SO."""
-    host_subnet = _prompt_required_text("Rango/Subred (ej. 192.168.1.0/24) » ", "Rango/Subred")
-    if host_subnet is None:
-        return
 
-    timeout = _prompt_int("Timeout ARP (1s) » ", default=1, minimum=1)
-    fmt = _prompt_output_format()
+def _build_traceroute_report(host: str, max_hops: int, timeout: int) -> dict[str, Any]:
+    return {
+        "host": host,
+        "max_hops": max_hops,
+        "timeout": timeout,
+        "hops": traceroute_host(host, max_hops=max_hops, timeout=timeout),
+    }
 
-    print(" ")
-    console.print(f":globe_with_meridians: Mapeando subred {host_subnet} (timeout {timeout}s)...", style="cyan")
-    
-    # Importar las funciones correctas
-    from hir.core.network import enhanced_arp_scan, get_vendor_from_mac, hybrid_os_fingerprint
-    
+
+def _build_arp_report(subnet: str, timeout: int) -> dict[str, Any]:
     try:
-        # Usar el nombre correcto de la función
-        devices = enhanced_arp_scan(host_subnet, timeout)
-    except Exception as e:
-        console.print(f"[red]Error ARP scan:[/] {e}")
-        return
+        devices = enhanced_arp_scan(subnet, timeout=timeout)
+    except Exception as exc:
+        if _is_privilege_error(exc):
+            raise click.ClickException(
+                "ARP scan requires root privileges or raw-socket capabilities "
+                "(CAP_NET_RAW/CAP_NET_ADMIN). Re-run with sudo or grant the "
+                "required capabilities to the Python environment."
+            ) from exc
+        raise click.ClickException(f"ARP scan failed: {exc}") from exc
 
-    # Estimación heurística de SO para cada host
-    for dev in devices:
-        # Vendor lookup
-        dev['vendor'] = get_vendor_from_mac(dev['mac'])
+    normalized_devices: list[dict[str, str]] = []
+    for device in devices:
+        normalized_device = dict(device)
+        normalized_device["vendor"] = get_vendor_from_mac(device["mac"])
         try:
-            dev['os'] = _format_os_guess(hybrid_os_fingerprint(dev['ip']))
+            raw_os = hybrid_os_fingerprint(device["ip"])
         except Exception:
-            dev['os'] = _format_os_guess(None)
-    
-    data = {"subnet": host_subnet, "devices": devices}
+            raw_os = None
+        normalized_device["os"] = _format_os_guess(raw_os)
+        normalized_devices.append(normalized_device)
 
-    # Output según formato
-    if fmt == "console":
-        print(" ")
-        console.print(f"[bold]Dispositivos encontrados en {host_subnet}:[/]")
-        console.print("[dim]El sistema operativo mostrado es una estimación heurística basada en las señales disponibles.[/]")
-        print(" ")
-        console.print("IP               MAC                Vendor         SO estimado")
-        for d in devices:
-            console.print(f"{d['ip']:<16} {d['mac']:<18} {d['vendor']:<13} {d['os']}")
-    elif fmt == "json":
-        out = dump_json(data, base_filename=f"arpmap_{host_subnet.replace('/','_')}")
-        console.print(f"[green]JSON >> {out}[/]")
-    else:
-        out = render_html(data, base_filename=f"arpmap_{host_subnet.replace('/','_')}")
-        console.print(f"[green]HTML >> {out}[/]")
-    console.print()
+    return {
+        "subnet": subnet,
+        "timeout": timeout,
+        "devices": normalized_devices,
+        "os_note": "El sistema operativo mostrado es una estimación heurística.",
+    }
 
-def main():
-    splash()
-    menu_loop()
+
+def _load_report_data(report_path: Path) -> dict[str, Any]:
+    try:
+        raw_data = json.loads(report_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise click.ClickException(f"Unable to read report file: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise click.ClickException(f"Report file is not valid JSON: {report_path}") from exc
+
+    if not isinstance(raw_data, dict):
+        raise click.ClickException("Report file must contain a top-level JSON object.")
+
+    if "hops" in raw_data and "host" in raw_data:
+        return raw_data
+    if "devices" in raw_data and "subnet" in raw_data:
+        return raw_data
+
+    raise click.ClickException(
+        "Unsupported report type. report-export only accepts traceroute or arp-scan JSON exports."
+    )
+
+
+@click.group(context_settings=_HELP_CONTEXT)
+def cli() -> None:
+    """HIR network diagnostics for the validated Python workflow."""
+
+
+@cli.command("ping")
+@click.argument("host")
+@click.option("--count", default=4, show_default=True, type=click.IntRange(min=1))
+@click.option("--timeout", default=2, show_default=True, type=click.IntRange(min=1))
+@click.option(
+    "--format",
+    "output_format",
+    default="console",
+    show_default=True,
+    type=click.Choice(["console", "json"], case_sensitive=False),
+)
+@click.option(
+    "--output-dir",
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+    default=None,
+    help="Directory used for JSON exports.",
+)
+def ping_command(host: str, count: int, timeout: int, output_format: str, output_dir: Path | None) -> None:
+    """Run ICMP ping against HOST."""
+    _validate_export_options(output_format, output_dir)
+
+    try:
+        report = _build_ping_report(host, count=count, timeout=timeout)
+    except (RuntimeError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if output_format == "console":
+        click.echo(f"Ping report for {report['host']}")
+        click.echo(f"Sent: {report['count']}  Received: {report['received']}")
+        if report["received"]:
+            click.echo(
+                "RTT ms: "
+                f"min={report['min_ms']:.2f} "
+                f"avg={report['avg_ms']:.2f} "
+                f"max={report['max_ms']:.2f}"
+            )
+        else:
+            click.echo("No ICMP replies were parsed from ping output.")
+        return
+
+    report_path = _export_report(
+        report,
+        output_format=output_format,
+        base_filename=f"ping_{_slugify(host)}",
+        output_dir=output_dir,
+    )
+    click.echo(report_path)
+
+
+@cli.command("traceroute")
+@click.argument("host")
+@click.option("--max-hops", default=30, show_default=True, type=click.IntRange(min=1))
+@click.option("--timeout", default=2, show_default=True, type=click.IntRange(min=1))
+@click.option(
+    "--format",
+    "output_format",
+    default="console",
+    show_default=True,
+    type=click.Choice(["console", "json", "html"], case_sensitive=False),
+)
+@click.option(
+    "--output-dir",
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+    default=None,
+    help="Directory used for JSON or HTML exports.",
+)
+def traceroute_command(
+    host: str,
+    max_hops: int,
+    timeout: int,
+    output_format: str,
+    output_dir: Path | None,
+) -> None:
+    """Run traceroute against HOST."""
+    _validate_export_options(output_format, output_dir)
+
+    try:
+        report = _build_traceroute_report(host, max_hops=max_hops, timeout=timeout)
+    except (RuntimeError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if output_format == "console":
+        click.echo(f"Traceroute report for {report['host']}")
+        if not report["hops"]:
+            click.echo("No hops were parsed from traceroute output.")
+            return
+
+        for hop, ip, rtt in report["hops"]:
+            click.echo(f"{hop:>2}  {ip:<15}  {_format_rtt(rtt)}")
+        return
+
+    report_path = _export_report(
+        report,
+        output_format=output_format,
+        base_filename=f"traceroute_{_slugify(host)}",
+        output_dir=output_dir,
+    )
+    click.echo(report_path)
+
+
+@cli.command("arp-scan")
+@click.argument("subnet")
+@click.option("--timeout", default=1, show_default=True, type=click.IntRange(min=1))
+@click.option(
+    "--format",
+    "output_format",
+    default="console",
+    show_default=True,
+    type=click.Choice(["console", "json", "html"], case_sensitive=False),
+)
+@click.option(
+    "--output-dir",
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+    default=None,
+    help="Directory used for JSON or HTML exports.",
+)
+def arp_scan_command(subnet: str, timeout: int, output_format: str, output_dir: Path | None) -> None:
+    """Run an ARP scan against SUBNET."""
+    _validate_export_options(output_format, output_dir)
+
+    report = _build_arp_report(subnet, timeout=timeout)
+
+    if output_format == "console":
+        click.echo(f"ARP scan report for {report['subnet']}")
+        click.echo("OS results are heuristic guesses based on available network signals.")
+        if not report["devices"]:
+            click.echo("No devices were discovered.")
+            return
+
+        header = f"{'IP':<15} {'MAC':<17} {'Vendor':<20} Heuristic OS guess"
+        click.echo(header)
+        for device in report["devices"]:
+            click.echo(
+                f"{device['ip']:<15} {device['mac']:<17} "
+                f"{device['vendor']:<20} {device['os']}"
+            )
+        return
+
+    report_path = _export_report(
+        report,
+        output_format=output_format,
+        base_filename=f"arp_scan_{_slugify(subnet)}",
+        output_dir=output_dir,
+    )
+    click.echo(report_path)
+
+
+@cli.command("report-export")
+@click.argument("report_path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option(
+    "--output-dir",
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+    default=None,
+    help="Directory used for HTML exports.",
+)
+@click.option(
+    "--base-filename",
+    default=None,
+    help="Optional base filename for the generated HTML report.",
+)
+def report_export_command(report_path: Path, output_dir: Path | None, base_filename: str | None) -> None:
+    """Render a supported JSON report to HTML."""
+    report = _load_report_data(report_path)
+    html_path = render_html(
+        report,
+        base_filename=base_filename or report_path.stem,
+        directory=str(output_dir) if output_dir is not None else "results/html",
+    )
+    click.echo(html_path)
+
+
+def main(args: Sequence[str] | None = None) -> None:
+    """Run the HIR CLI entry point."""
+    cli.main(args=list(args) if args is not None else None, prog_name="hir")
+
 
 if __name__ == "__main__":
     main()

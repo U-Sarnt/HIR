@@ -1,42 +1,52 @@
 # HIR
 
-HIR is an early-stage Python CLI for basic network diagnostics and report export.
+HIR is an early-stage Python CLI for conservative network diagnostics and report export.
 
-## Current scope
+## Validated scope
 
-- Ping and traceroute using system binaries.
-- Local ARP scan with Scapy.
-- MAC vendor lookup when a local OUI database is available.
-- Heuristic operating system estimation for hosts discovered during ARP scan.
+- `hir ping` runs ICMP ping through the system `ping` binary.
+- `hir traceroute` runs traceroute through the system `traceroute` binary.
+- `hir arp-scan` performs a local ARP scan with Scapy.
+- `hir report-export` renders supported JSON reports to HTML through the bundled templates.
 
-## Relevant limitations
+## Current limits
 
-- Operating system results are heuristic estimates. This project does not currently validate or guarantee an accuracy percentage.
-- Some features depend on system tools such as `ping`, `traceroute`, and, for some fingerprint attempts, `nmap`.
-- ARP scan requires suitable network privileges such as `root` or equivalent capabilities.
-- `Cargo.toml`, `Dockerfile`, and `rust_ext/` are present in the repository, but they are not part of the documented or validated usage path in the current state of the project.
+- OS fingerprinting is explicitly heuristic. HIR does not claim a validated accuracy rate.
+- `ping` and `traceroute` depend on the corresponding system binaries being installed.
+- ARP scan requires `root` privileges or equivalent raw-socket capabilities such as `CAP_NET_RAW`.
+- The public workflow validated in this repository is Python-only.
 
-## Requirements
-
-- Python 3.10+
-
-## Getting started
+## Installation
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv
+. .venv/bin/activate
 pip install -e .
 ```
+
+## CLI usage
+
+```bash
+hir --help
+hir ping 1.1.1.1
+hir traceroute example.com --format json
+hir arp-scan 192.168.1.0/24 --format html
+hir report-export results/json/traceroute_example_com_01.json
+```
+
+For JSON and HTML exports, the command prints the generated report path to stdout.
 
 ## Recommended validation
 
 ```bash
-python -m pytest
+pip install -e .
+hir --help
+hir ping --help
+hir traceroute --help
+hir arp-scan --help
+hir report-export --help
+pytest -q
 ```
-
-## Status
-
-This project is in early development. The current goal is a maintainable CLI with conservative, observable behavior rather than broad capability claims.
 
 ## License
 

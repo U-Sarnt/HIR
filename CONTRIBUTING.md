@@ -1,42 +1,35 @@
 # Contributing to HIR
 
-Thank you for your interest in contributing!
-
-## Getting started
-
-1. Fork the repository and create a branch from `master`.
-2. Set up the development environment:
+## Development setup
 
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-python -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv
+. .venv/bin/activate
 pip install -e .
 ```
 
-3. Make your changes.
-4. Run the test suite before submitting:
+## Expected validation before opening a PR
 
 ```bash
-python -m pytest -q
-cargo test
+pytest -q
+hir --help
+hir ping --help
+hir traceroute --help
+hir arp-scan --help
+hir report-export --help
 ```
 
-5. Open a pull request describing what you changed and why.
+## Scope expectations
 
-## Code style
+- Keep the documented workflow aligned with the validated Python CLI.
+- Be explicit when a result is heuristic, especially around OS fingerprinting.
+- Do not leave placeholder artifacts that imply unsupported Rust or Docker workflows.
 
-- Python: follow PEP 8.
-- Rust: run `cargo fmt` and `cargo clippy` before committing.
-
-## Reporting bugs
+## Reporting issues
 
 Open a GitHub issue with:
-- A clear description of the problem
-- Steps to reproduce
-- Expected vs actual behavior
-- Python and Rust toolchain versions
 
-## Feature requests
-
-Open a GitHub issue describing the feature and the use case it solves.
+- A clear problem statement
+- Reproduction steps
+- Expected behavior and actual behavior
+- Python version and relevant system tool versions such as `ping`, `traceroute`, or `nmap`

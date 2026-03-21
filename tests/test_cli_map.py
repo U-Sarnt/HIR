@@ -1,58 +1,61 @@
+import json
+from pathlib import Path
+
+from click.testing import CliRunner
+
 import hir.cli as cli_mod
-import hir.core.network as network_mod
 
 
-class DummyConsole:
-    def __init__(self):
-        self.messages = []
+def test_arp_scan_permission_failure_is_actionable(monkeypatch):
+    def raise_permission_error(_subnet: str, timeout: int):
+        raise PermissionError("Operation not permitted")
 
-    def print(self, *args, **kwargs):
-        self.messages.append(" ".join(str(arg) for arg in args))
+    monkeypatch.setattr(cli_mod, "enhanced_arp_scan", raise_permission_error)
+
+    result = CliRunner().invoke(cli_mod.cli, ["arp-scan", "192.168.1.0/24"])
+
+    assert result.exit_code != 0
+    assert "root privileges" in result.output
+    assert "CAP_NET_RAW" in result.output
+    assert "Traceback" not in result.output
 
 
-def test_cmd_map_console_marks_os_as_estimated(monkeypatch):
-    answers = iter(["192.168.1.0/24", "1", "c"])
-    console = DummyConsole()
-
-    monkeypatch.setattr(cli_mod, "prompt", lambda _message: next(answers))
-    monkeypatch.setattr(cli_mod, "console", console)
+def test_arp_scan_console_keeps_os_wording_honest(monkeypatch):
     monkeypatch.setattr(
-        network_mod,
+        cli_mod,
         "enhanced_arp_scan",
-        lambda subnet, timeout: [{"ip": "192.168.1.10", "mac": "aa:bb:cc:dd:ee:ff"}],
+        lambda _subnet, timeout: [{"ip": "192.168.1.10", "mac": "aa:bb:cc:dd:ee:ff"}],
     )
-    monkeypatch.setattr(network_mod, "get_vendor_from_mac", lambda _mac: "Test Vendor")
-    monkeypatch.setattr(network_mod, "hybrid_os_fingerprint", lambda _ip: "Linux/Unix")
+    monkeypatch.setattr(cli_mod, "get_vendor_from_mac", lambda _mac: "Test Vendor")
+    monkeypatch.setattr(cli_mod, "hybrid_os_fingerprint", lambda _ip: "Linux/Unix")
 
-    cli_mod.cmd_map()
+    result = CliRunner().invoke(cli_mod.cli, ["arp-scan", "192.168.1.0/24"])
 
-    assert any("SO estimado" in message for message in console.messages)
-    assert any("estimación heurística" in message for message in console.messages)
-    assert any("Posible Linux/Unix (heurístico)" in message for message in console.messages)
+    assert result.exit_code == 0
+    assert "OS results are heuristic guesses" in result.output
+    assert "Heuristic OS guess" in result.output
+    assert "Posible Linux/Unix (heurístico)" in result.output
+    assert "accuracy" not in result.output.lower()
 
 
-def test_cmd_map_json_reports_insufficient_data_for_unknown_os(monkeypatch):
-    answers = iter(["192.168.1.0/24", "1", "j"])
-    console = DummyConsole()
-    captured = {}
-
-    monkeypatch.setattr(cli_mod, "prompt", lambda _message: next(answers))
-    monkeypatch.setattr(cli_mod, "console", console)
-    monkeypatch.setattr(
-        network_mod,
-        "enhanced_arp_scan",
-        lambda subnet, timeout: [{"ip": "192.168.1.10", "mac": "aa:bb:cc:dd:ee:ff"}],
+def test_report_export_renders_supported_json_report(tmp_path):
+    report_path = tmp_path / "traceroute.json"
+    report_path.write_text(
+        json.dumps({"host": "example.com", "hops": [[1, "192.168.1.1", 1.23]]}),
+        encoding="utf-8",
     )
-    monkeypatch.setattr(network_mod, "get_vendor_from_mac", lambda _mac: "Test Vendor")
-    monkeypatch.setattr(network_mod, "hybrid_os_fingerprint", lambda _ip: "Desconocido")
 
-    def fake_dump_json(data, base_filename=None, directory="results/json"):
-        captured["data"] = data
-        return "/tmp/arp.json"
+    result = CliRunner().invoke(
+        cli_mod.cli,
+        ["report-export", str(report_path), "--output-dir", str(tmp_path / "html")],
+    )
 
-    monkeypatch.setattr(cli_mod, "dump_json", fake_dump_json)
+    assert result.exit_code == 0
 
-    cli_mod.cmd_map()
+    html_path = Path(result.output.strip())
+    html = html_path.read_text(encoding="utf-8")
 
-    assert captured["data"]["devices"][0]["os"] == "Sin datos suficientes"
-    assert any("JSON >> /tmp/arp.json" in message for message in console.messages)
+    assert html_path.name == "traceroute_01.html"
+    assert "<title>Reporte Traceroute" in html
+    assert "example.com" in html
+    assert "192.168.1.1" in html
