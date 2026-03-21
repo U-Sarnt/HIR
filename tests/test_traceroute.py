@@ -1,3 +1,5 @@
+import pytest
+
 from hir.core.traceroute import traceroute_host
 
 
@@ -36,3 +38,42 @@ def test_traceroute_parses_ip_only(monkeypatch):
     hops = traceroute_host("1.1.1.1")
 
     assert hops == [(1, "10.0.0.1", 4.56)]
+
+
+def test_traceroute_accepts_partial_results_with_returncode_one(monkeypatch):
+    output = (
+        "traceroute to example.com (93.184.216.34), 30 hops max\n"
+        " 1  router.local (192.168.1.1)  1.23 ms\n"
+    )
+    monkeypatch.setattr(
+        "hir.core.traceroute.subprocess.run",
+        lambda *args, **kwargs: FakeCompletedProcess(output, returncode=1),
+    )
+
+    hops = traceroute_host("example.com")
+
+    assert hops == [(1, "192.168.1.1", 1.23)]
+
+
+def test_traceroute_missing_binary_raises_clear_error(monkeypatch):
+    def raise_missing_binary(*args, **kwargs):
+        raise FileNotFoundError
+
+    monkeypatch.setattr("hir.core.traceroute.subprocess.run", raise_missing_binary)
+
+    with pytest.raises(RuntimeError, match="El comando 'traceroute' no está instalado"):
+        traceroute_host("example.com")
+
+
+def test_traceroute_non_tolerated_returncode_raises(monkeypatch):
+    monkeypatch.setattr(
+        "hir.core.traceroute.subprocess.run",
+        lambda *args, **kwargs: FakeCompletedProcess(
+            "",
+            returncode=2,
+            stderr="network unreachable",
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="network unreachable"):
+        traceroute_host("example.com")
