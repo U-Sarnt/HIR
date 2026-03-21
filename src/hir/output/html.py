@@ -1,6 +1,20 @@
 import os
 from datetime import datetime
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, PackageLoader, select_autoescape
+
+
+def _create_template_environment() -> Environment:
+    return Environment(
+        loader=PackageLoader("hir.output", "templates"),
+        autoescape=select_autoescape(["html"]),
+    )
+
+
+def _select_template_name(data: dict) -> str:
+    if "hops" in data:
+        return "traceroute_report.html.j2"
+    return "arp_report.html.j2"
+
 
 def render_html(data: dict, base_filename: str = None, directory: str = "results/html") -> str:
     os.makedirs(directory, exist_ok=True)
@@ -9,15 +23,13 @@ def render_html(data: dict, base_filename: str = None, directory: str = "results
     filename = f"{base_filename}_{idx:02d}.html" if base_filename else f"report_{idx:02d}.html"
     out_path = os.path.join(directory, filename)
 
-    templates_dir = os.path.join(os.path.dirname(__file__), "templates")
-    env = Environment(loader=FileSystemLoader(templates_dir), autoescape=select_autoescape(["html"]))
+    env = _create_template_environment()
 
     # Selección de plantilla
+    template = env.get_template(_select_template_name(data))
     if "hops" in data:
-        template = env.get_template("traceroute_report.html.j2")
         rendered = template.render(host=data["host"], hops=data["hops"], timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     else:
-        template = env.get_template("arp_report.html.j2")
         rendered = template.render(subnet=data["subnet"], devices=data["devices"], timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     with open(out_path, 'w', encoding='utf-8') as f:
