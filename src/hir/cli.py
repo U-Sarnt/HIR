@@ -4,7 +4,7 @@ from rich.console import Console
 from rich.panel import Panel
 from prompt_toolkit import prompt
 from hir.core.network import enhanced_arp_scan, get_vendor_from_mac, hybrid_os_fingerprint
-from hir.core.ping import ping_host
+from hir.core.ping import build_ping_command, parse_ping_line
 from hir.core.traceroute import traceroute_host
 from hir.output.json import dump_json
 from hir.output.html import render_html
@@ -18,7 +18,13 @@ except ImportError:
 
 console = Console()
 
-def _prompt_int(message: str, default: int | None = None, empty_value: int | None = None, empty_hint: str | None = None) -> int | None:
+def _prompt_int(
+    message: str,
+    default: int | None = None,
+    empty_value: int | None = None,
+    empty_hint: str | None = None,
+    minimum: int | None = None,
+) -> int | None:
     """Lee enteros de forma segura y evita tracebacks por entradas triviales inválidas."""
     while True:
         raw = prompt(message).strip()
@@ -26,7 +32,7 @@ def _prompt_int(message: str, default: int | None = None, empty_value: int | Non
             return default if default is not None else empty_value
 
         try:
-            return int(raw)
+            value = int(raw)
         except ValueError:
             hint = ""
             if default is not None:
@@ -34,6 +40,41 @@ def _prompt_int(message: str, default: int | None = None, empty_value: int | Non
             elif empty_hint:
                 hint = f" Pulsa Enter para {empty_hint}."
             console.print(f"[red]Entrada no válida '{raw}'. Introduce un número entero.{hint}[/]")
+            continue
+
+        if minimum is not None and value < minimum:
+            console.print(
+                f"[red]Entrada no válida '{raw}'. Introduce un número entero mayor o igual que {minimum}.[/]"
+            )
+            continue
+
+        return value
+
+
+def _prompt_required_text(message: str, field_name: str) -> str | None:
+    value = prompt(message).strip()
+    if value:
+        return value
+
+    console.print(f"[red]{field_name} no puede estar vacío.[/]")
+    console.print()
+    return None
+
+
+def _prompt_output_format() -> str:
+    fmt_input = prompt("Formato (console[c]/json[j]/html[h]) » ").strip().lower()
+    fmt = {
+        "c": "console",
+        "console": "console",
+        "j": "json",
+        "json": "json",
+        "h": "html",
+        "html": "html",
+    }.get(fmt_input)
+    if fmt is None:
+        console.print(f"[red]Formato no válido '{fmt_input}', usando 'console' por defecto[/]")
+        return "console"
+    return fmt
 
 def splash():
     console.clear()
@@ -69,19 +110,24 @@ def menu_loop():
 
 def cmd_ping():
     """Ejecuta ping en tiempo real, soporta Ctrl+C y modo continuo."""
-    host = prompt("Host/IP » ").strip()
+    host = _prompt_required_text("Host/IP » ", "Host/IP")
+    if host is None:
+        return
+
     count = _prompt_int(
         "Paquetes (4) / Enter para continuo sin fin » ",
         empty_value=None,
         empty_hint="activar el modo continuo",
+        minimum=1,
     )
-    timeout = _prompt_int("Timeout (2s) » ", default=2)
+    timeout = _prompt_int("Timeout (2s) » ", default=2, minimum=1)
 
-    # Construye comando ping
-    cmd = ["ping"]
-    if count is not None:
-        cmd += ["-c", str(count)]
-    cmd += ["-W", str(timeout), host]
+    try:
+        cmd = build_ping_command(host, count=count, timeout=timeout)
+    except ValueError as e:
+        console.print(f"[red]ERROR:[/] {e}")
+        console.print()
+        return
 
     modo = "continuo" if count is None else f"{count} paquetes"    
     print(" ")
@@ -90,15 +136,19 @@ def cmd_ping():
 
     # Ejecuta ping y captura interrupción
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    error_lines = []
     try:
-        for raw in proc.stdout:
-            line = raw.strip()
-            if "bytes from" in line:
-                parts = line.split()
-                ttl = next((p.split("=")[1] for p in parts if p.startswith("ttl=")), "-")
-                tiempo = next((p.split("=")[1] for p in parts if p.startswith("time=")), "-")
-                tipo = "ICMP"
-                console.print(f"[magenta]{ttl:<6}[/] [yellow]{tipo:<6}[/]  {tiempo} ms")
+        for raw in proc.stdout or ():
+            reply = parse_ping_line(raw)
+            if reply is None:
+                line = raw.strip()
+                if line:
+                    error_lines.append(line)
+                continue
+
+            ttl = "-" if reply.ttl is None else str(reply.ttl)
+            tiempo = reply.time_text or "-"
+            console.print(f"[magenta]{ttl:<6}[/] [yellow]ICMP  [/]  {tiempo} ms")
     except KeyboardInterrupt:
         # Interrupción del usuario
         console.print("\n[bold red]Ping interrumpido por usuario. Volviendo al menú...[/]")
@@ -107,25 +157,20 @@ def cmd_ping():
         console.print()
         return
 
-    proc.wait()
+    returncode = proc.wait()
+    if returncode != 0:
+        detail = f": {error_lines[-1]}" if error_lines else ""
+        console.print(f"[red]ERROR:[/] ping falló ({host}){detail}")
     console.print()
 
 def cmd_traceroute():
-    host       = prompt("Host/IP » ").strip()
-    max_hops   = _prompt_int("Hops (30) » ", default=30)
-    timeout    = _prompt_int("Timeout (2s) » ", default=2)
-    fmt_input  = prompt("Formato (console[c]/json[j]/html[h]) » ").strip().lower()
+    host = _prompt_required_text("Host/IP » ", "Host/IP")
+    if host is None:
+        return
 
-    # Mapear abreviaturas
-    if fmt_input in ("c", "console"):
-        fmt = "console"
-    elif fmt_input in ("j", "json"):
-        fmt = "json"
-    elif fmt_input in ("h", "html"):
-        fmt = "html"
-    else:
-        console.print(f"[red]Formato no válido '{fmt_input}', usando 'console' por defecto[/]")
-        fmt = "console"
+    max_hops = _prompt_int("Hops (30) » ", default=30, minimum=1)
+    timeout = _prompt_int("Timeout (2s) » ", default=2, minimum=1)
+    fmt = _prompt_output_format()
 
     fn = fast_traceroute or traceroute_host
     try:
@@ -153,15 +198,12 @@ def cmd_traceroute():
 
 def cmd_map():
     """Realiza ARP scan + OS fingerprint y muestra resultado en console/json/html."""
-    host_subnet = prompt("Rango/Subred (ej. 192.168.1.0/24) » ").strip()
-    timeout     = _prompt_int("Timeout ARP (1s) » ", default=1)
-    fmt_input   = prompt("Formato (console[c]/json[j]/html[h]) » ").strip().lower()
-    if fmt_input in ("c", "console"): fmt = "console"
-    elif fmt_input in ("j", "json"): fmt = "json"
-    elif fmt_input in ("h", "html"): fmt = "html"
-    else:
-        console.print(f"[red]Formato no válido '{fmt_input}', usando console[/]")
-        fmt = "console"
+    host_subnet = _prompt_required_text("Rango/Subred (ej. 192.168.1.0/24) » ", "Rango/Subred")
+    if host_subnet is None:
+        return
+
+    timeout = _prompt_int("Timeout ARP (1s) » ", default=1, minimum=1)
+    fmt = _prompt_output_format()
 
     print(" ")
     console.print(f":globe_with_meridians: Mapeando subred {host_subnet} (timeout {timeout}s)...", style="cyan")

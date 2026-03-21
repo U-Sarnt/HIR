@@ -1,5 +1,5 @@
 import pytest
-from hir.core.ping import ping_host
+from hir.core.ping import build_ping_command, parse_ping_line, ping_host
 
 class FakeProc:
     def __init__(self, returncode, stdout, stderr=""):
@@ -29,3 +29,16 @@ def test_ping_failure(monkeypatch):
         ping_host("bad.host", count=1, timeout=1)
     assert "host unreachable" in str(exc.value)
 
+def test_build_ping_command_allows_continuous_mode():
+    assert build_ping_command("1.1.1.1", count=None, timeout=2) == ["ping", "-W", "2", "1.1.1.1"]
+
+def test_build_ping_command_rejects_invalid_timeout():
+    with pytest.raises(ValueError):
+        build_ping_command("1.1.1.1", count=1, timeout=0)
+
+def test_parse_ping_line_returns_structured_reply():
+    reply = parse_ping_line("64 bytes from 1.1.1.1: icmp_seq=1 ttl=58 time=10.1 ms")
+    assert reply is not None
+    assert reply.ttl == 58
+    assert reply.time_ms == 10.1
+    assert reply.time_text == "10.1"
