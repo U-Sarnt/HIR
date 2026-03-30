@@ -1,17 +1,21 @@
 # Security Policy
 
-## Supported versions
+HIR is an early-stage CLI that may run network diagnostics with elevated privileges. Please report security issues privately.
 
-Only the latest version on the `master` branch is actively maintained.
+## Supported Versions
 
-## Reporting a vulnerability
+Security fixes are applied to the latest code on the default branch. Older revisions should be assumed unsupported unless stated otherwise.
 
-If you discover a security vulnerability, please do **not** open a public GitHub issue.
+## Reporting a Vulnerability
 
-Instead, email **u.sarnt@proton.me** with:
+Do not open a public GitHub issue for suspected vulnerabilities.
 
-- A description of the vulnerability
-- Steps to reproduce it
-- The potential impact
+Report security issues by email to **u.sarnt@proton.me**. Include:
 
-You will receive a response within 72 hours. Please allow time to investigate and patch before any public disclosure.
+- the affected version or commit, if known
+- a clear description of the issue
+- reproduction steps or a proof of concept
+- the expected impact
+- any relevant environment details
+
+An acknowledgement should be sent within 72 hours. Please allow reasonable time for investigation and coordinated remediation before public disclosure.
