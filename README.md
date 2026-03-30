@@ -52,14 +52,8 @@ Prerequisites for live diagnostics:
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-<<<<<<< Updated upstream
 python -m pip install --upgrade pip
 python -m pip install -e .
-```
-
-## Quick Usage
-=======
-pip install .
 ```
 
 For local development, use `pip install -e ".[dev]"`.
@@ -67,7 +61,6 @@ For local development, use `pip install -e ".[dev]"`.
 Packaging and release instructions live in [docs/PACKAGING_AND_RELEASES.md](docs/PACKAGING_AND_RELEASES.md).
 
 ## CLI usage
->>>>>>> Stashed changes
 
 ```bash
 hir --help
@@ -85,11 +78,7 @@ JSON and HTML exports print the generated file path to standard output. By defau
 On a clean Linux environment, validate the documented path with:
 
 ```bash
-<<<<<<< Updated upstream
-python -m pip install -e . pytest
-=======
-pip install -e ".[dev]"
->>>>>>> Stashed changes
+python -m pip install -e ".[dev]"
 hir --help
 hir ping --help
 hir traceroute --help
@@ -114,6 +103,9 @@ hir report-export results/json/arp_scan_192_168_1_0_24_01.json
 - [SECURITY.md](SECURITY.md) explains how to report vulnerabilities.
 - [docs/PROJECT_POSITIONING.md](docs/PROJECT_POSITIONING.md) summarizes the public positioning.
 - [docs/PHASE1_SUMMARY.md](docs/PHASE1_SUMMARY.md) records what phase 1 changed and what remains deferred.
+- [docs/PHASE2_SUMMARY.md](docs/PHASE2_SUMMARY.md) records packaging and release work from phase 2.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the current internal layout after the phase 3 cleanup.
+- [docs/PHASE3_SUMMARY.md](docs/PHASE3_SUMMARY.md) summarizes the architecture refactor and remaining debt.
 
 ## License
 

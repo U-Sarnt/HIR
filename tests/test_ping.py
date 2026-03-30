@@ -1,4 +1,5 @@
 import pytest
+from hir.core.errors import CommandExecutionError, DependencyMissingError
 from hir.core.ping import build_ping_command, parse_ping_line, ping_host
 
 
@@ -33,7 +34,7 @@ def test_ping_failure(monkeypatch):
         "hir.core.ping.subprocess.run",
         lambda *args, **kw: FakeProc(1, "", "host unreachable"),
     )
-    with pytest.raises(RuntimeError) as exc:
+    with pytest.raises(CommandExecutionError) as exc:
         ping_host("bad.host", count=1, timeout=1)
     assert "host unreachable" in str(exc.value)
 
@@ -44,7 +45,7 @@ def test_ping_missing_binary_reports_clear_error(monkeypatch):
 
     monkeypatch.setattr("hir.core.ping.subprocess.run", raise_missing_binary)
 
-    with pytest.raises(RuntimeError, match="El comando 'ping' no está instalado"):
+    with pytest.raises(DependencyMissingError, match="El comando 'ping' no está instalado"):
         ping_host("1.1.1.1", count=1, timeout=1)
 
 

@@ -1,5 +1,6 @@
 import pytest
 
+from hir.core.errors import CommandExecutionError, DependencyMissingError
 from hir.core.traceroute import traceroute_host
 
 
@@ -61,7 +62,7 @@ def test_traceroute_missing_binary_raises_clear_error(monkeypatch):
 
     monkeypatch.setattr("hir.core.traceroute.subprocess.run", raise_missing_binary)
 
-    with pytest.raises(RuntimeError, match="El comando 'traceroute' no está instalado"):
+    with pytest.raises(DependencyMissingError, match="El comando 'traceroute' no está instalado"):
         traceroute_host("example.com")
 
 
@@ -75,5 +76,5 @@ def test_traceroute_non_tolerated_returncode_raises(monkeypatch):
         ),
     )
 
-    with pytest.raises(RuntimeError, match="network unreachable"):
+    with pytest.raises(CommandExecutionError, match="network unreachable"):
         traceroute_host("example.com")

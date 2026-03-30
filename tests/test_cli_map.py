@@ -4,13 +4,19 @@ from pathlib import Path
 from click.testing import CliRunner
 
 import hir.cli as cli_mod
+from hir.core.errors import PrivilegeRequiredError
+from hir.core.models import ArpHost, ArpScanResult
 
 
 def test_arp_scan_permission_failure_is_actionable(monkeypatch):
-    def raise_permission_error(_subnet: str, timeout: int):
-        raise PermissionError("Operation not permitted")
+    def raise_permission_error(_subnet: str, timeout: int) -> ArpScanResult:
+        raise PrivilegeRequiredError(
+            "ARP scan requires root privileges or raw-socket capabilities "
+            "(CAP_NET_RAW/CAP_NET_ADMIN). Re-run with sudo or grant the "
+            "required capabilities to the Python environment."
+        )
 
-    monkeypatch.setattr(cli_mod, "enhanced_arp_scan", raise_permission_error)
+    monkeypatch.setattr(cli_mod, "run_arp_scan", raise_permission_error)
 
     result = CliRunner().invoke(cli_mod.cli, ["arp-scan", "192.168.1.0/24"])
 
@@ -23,11 +29,20 @@ def test_arp_scan_permission_failure_is_actionable(monkeypatch):
 def test_arp_scan_console_keeps_os_wording_honest(monkeypatch):
     monkeypatch.setattr(
         cli_mod,
-        "enhanced_arp_scan",
-        lambda _subnet, timeout: [{"ip": "192.168.1.10", "mac": "aa:bb:cc:dd:ee:ff"}],
+        "run_arp_scan",
+        lambda _subnet, timeout: ArpScanResult(
+            subnet="192.168.1.0/24",
+            timeout=timeout,
+            devices=(
+                ArpHost(
+                    ip="192.168.1.10",
+                    mac="aa:bb:cc:dd:ee:ff",
+                    vendor="Test Vendor",
+                    os="Posible Linux/Unix (heurístico)",
+                ),
+            ),
+        ),
     )
-    monkeypatch.setattr(cli_mod, "get_vendor_from_mac", lambda _mac: "Test Vendor")
-    monkeypatch.setattr(cli_mod, "hybrid_os_fingerprint", lambda _ip: "Linux/Unix")
 
     result = CliRunner().invoke(cli_mod.cli, ["arp-scan", "192.168.1.0/24"])
 

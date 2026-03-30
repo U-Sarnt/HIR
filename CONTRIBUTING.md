@@ -20,12 +20,8 @@ Prerequisites for live command checks:
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-<<<<<<< Updated upstream
 python -m pip install --upgrade pip
-python -m pip install -e . pytest
-=======
-pip install -e ".[dev]"
->>>>>>> Stashed changes
+python -m pip install -e ".[dev]"
 ```
 
 ## Tests and Validation

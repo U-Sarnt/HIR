@@ -5,6 +5,7 @@ import pytest
 from click.testing import CliRunner
 
 import hir.cli as cli_mod
+from hir.core.models import PingResult, TracerouteHop, TracerouteResult
 
 
 def test_main_help_entry_path(capsys):
@@ -38,11 +39,11 @@ def test_subcommand_help(args, expected_text):
 def test_ping_command_wires_backend_and_exports_json(monkeypatch, tmp_path):
     seen: dict[str, object] = {}
 
-    def fake_ping_host(host: str, count: int, timeout: int) -> list[float]:
+    def fake_run_ping(host: str, count: int, timeout: int) -> PingResult:
         seen["args"] = (host, count, timeout)
-        return [10.1, 12.3]
+        return PingResult.from_rtt(host=host, count=count, timeout=timeout, rtt_values=[10.1, 12.3])
 
-    monkeypatch.setattr(cli_mod, "ping_host", fake_ping_host)
+    monkeypatch.setattr(cli_mod, "run_ping", fake_run_ping)
 
     result = CliRunner().invoke(
         cli_mod.cli,
@@ -80,11 +81,16 @@ def test_ping_command_wires_backend_and_exports_json(monkeypatch, tmp_path):
 def test_traceroute_command_wires_backend(monkeypatch):
     seen: dict[str, object] = {}
 
-    def fake_traceroute_host(host: str, max_hops: int, timeout: int):
+    def fake_run_traceroute(host: str, max_hops: int, timeout: int) -> TracerouteResult:
         seen["args"] = (host, max_hops, timeout)
-        return [(1, "192.168.1.1", 1.23)]
+        return TracerouteResult(
+            host=host,
+            max_hops=max_hops,
+            timeout=timeout,
+            hops=(TracerouteHop(1, "192.168.1.1", 1.23),),
+        )
 
-    monkeypatch.setattr(cli_mod, "traceroute_host", fake_traceroute_host)
+    monkeypatch.setattr(cli_mod, "run_traceroute", fake_run_traceroute)
 
     result = CliRunner().invoke(
         cli_mod.cli,

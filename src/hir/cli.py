@@ -2,27 +2,23 @@
 
 from __future__ import annotations
 
-import json
-import math
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Sequence
 
 import click
 
-from hir.core.network import enhanced_arp_scan, get_vendor_from_mac, hybrid_os_fingerprint
-from hir.core.ping import ping_host
-from hir.core.traceroute import traceroute_host
+from hir.core.errors import HIRError
+from hir.core.models import ArpScanResult, PingResult, TracerouteResult
+from hir.core.arp import run_arp_scan
+from hir.core.ping import run_ping
+from hir.core.traceroute import run_traceroute
+from hir.output.console import render_arp_console, render_ping_console, render_traceroute_console
 from hir.output.html import render_html
-from hir.output.json import dump_json
+from hir.output.json import dump_json, load_report
 
 _HELP_CONTEXT = {"help_option_names": ["-h", "--help"]}
 
-
-def _format_os_guess(raw_os: str | None) -> str:
-    """Return an honest user-facing OS label for heuristic fingerprints."""
-    if not raw_os or raw_os == "Desconocido":
-        return "Sin datos suficientes"
-    return f"Posible {raw_os} (heurístico)"
+CoreReport = PingResult | TracerouteResult | ArpScanResult
 
 
 def _slugify(value: str) -> str:
@@ -30,135 +26,27 @@ def _slugify(value: str) -> str:
     return safe.strip("_") or "report"
 
 
-def _export_report(
-    data: dict[str, Any],
-    output_format: str,
-    base_filename: str,
-    output_dir: Path | None = None,
-) -> str | None:
-    """Export report data through the existing JSON or HTML backends."""
-    if output_format == "console":
-        return None
-
-    if output_format == "json":
-        directory = str(output_dir) if output_dir is not None else "results/json"
-        return dump_json(data, base_filename=base_filename, directory=directory)
-
-    directory = str(output_dir) if output_dir is not None else "results/html"
-    return render_html(data, base_filename=base_filename, directory=directory)
-
-
-def _format_rtt(value: float) -> str:
-    if math.isnan(value):
-        return "n/a"
-    return f"{value:.2f} ms"
-
-
 def _validate_export_options(output_format: str, output_dir: Path | None) -> None:
     if output_format == "console" and output_dir is not None:
         raise click.UsageError("--output-dir is only valid when exporting JSON or HTML.")
 
 
-def _is_privilege_error(exc: BaseException) -> bool:
-    if isinstance(exc, PermissionError):
-        return True
+def _export_report(
+    report: CoreReport,
+    *,
+    output_format: str,
+    base_filename: str,
+    output_dir: Path | None = None,
+) -> str | None:
+    if output_format == "console":
+        return None
 
-    if isinstance(exc, OSError) and exc.errno in {1, 13}:
-        return True
+    if output_format == "json":
+        directory = output_dir if output_dir is not None else Path("results/json")
+        return dump_json(report, base_filename=base_filename, directory=directory)
 
-    message = str(exc).lower()
-    return any(
-        hint in message
-        for hint in (
-            "operation not permitted",
-            "permission denied",
-            "not permitted",
-            "cannot set filter",
-        )
-    )
-
-
-def _build_ping_report(host: str, count: int, timeout: int) -> dict[str, Any]:
-    rtt_values = ping_host(host, count=count, timeout=timeout)
-    summary: dict[str, Any] = {
-        "host": host,
-        "count": count,
-        "timeout": timeout,
-        "rtt_ms": rtt_values,
-        "received": len(rtt_values),
-    }
-
-    if rtt_values:
-        summary["min_ms"] = min(rtt_values)
-        summary["avg_ms"] = sum(rtt_values) / len(rtt_values)
-        summary["max_ms"] = max(rtt_values)
-    else:
-        summary["min_ms"] = None
-        summary["avg_ms"] = None
-        summary["max_ms"] = None
-
-    return summary
-
-
-def _build_traceroute_report(host: str, max_hops: int, timeout: int) -> dict[str, Any]:
-    return {
-        "host": host,
-        "max_hops": max_hops,
-        "timeout": timeout,
-        "hops": traceroute_host(host, max_hops=max_hops, timeout=timeout),
-    }
-
-
-def _build_arp_report(subnet: str, timeout: int) -> dict[str, Any]:
-    try:
-        devices = enhanced_arp_scan(subnet, timeout=timeout)
-    except Exception as exc:
-        if _is_privilege_error(exc):
-            raise click.ClickException(
-                "ARP scan requires root privileges or raw-socket capabilities "
-                "(CAP_NET_RAW/CAP_NET_ADMIN). Re-run with sudo or grant the "
-                "required capabilities to the Python environment."
-            ) from exc
-        raise click.ClickException(f"ARP scan failed: {exc}") from exc
-
-    normalized_devices: list[dict[str, str]] = []
-    for device in devices:
-        normalized_device = dict(device)
-        normalized_device["vendor"] = get_vendor_from_mac(device["mac"])
-        try:
-            raw_os = hybrid_os_fingerprint(device["ip"])
-        except Exception:
-            raw_os = None
-        normalized_device["os"] = _format_os_guess(raw_os)
-        normalized_devices.append(normalized_device)
-
-    return {
-        "subnet": subnet,
-        "timeout": timeout,
-        "devices": normalized_devices,
-        "os_note": "El sistema operativo mostrado es una estimación heurística.",
-    }
-
-
-def _load_report_data(report_path: Path) -> dict[str, Any]:
-    try:
-        raw_data = json.loads(report_path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise click.ClickException(f"Unable to read report file: {exc}") from exc
-    except json.JSONDecodeError as exc:
-        raise click.ClickException(f"Report file is not valid JSON: {report_path}") from exc
-
-    if not isinstance(raw_data, dict):
-        raise click.ClickException("Report file must contain a top-level JSON object.")
-
-    if "hops" in raw_data and "host" in raw_data:
-        return raw_data
-    if "devices" in raw_data and "subnet" in raw_data:
-        return raw_data
-
-    raise click.ClickException(
-        "Unsupported report type. report-export only accepts traceroute or arp-scan JSON exports."
-    )
+    directory = output_dir if output_dir is not None else Path("results/html")
+    return render_html(report, base_filename=base_filename, directory=directory)
 
 
 @click.group(context_settings=_HELP_CONTEXT)
@@ -188,22 +76,12 @@ def ping_command(host: str, count: int, timeout: int, output_format: str, output
     _validate_export_options(output_format, output_dir)
 
     try:
-        report = _build_ping_report(host, count=count, timeout=timeout)
-    except (RuntimeError, ValueError) as exc:
+        report = run_ping(host, count=count, timeout=timeout)
+    except (HIRError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
     if output_format == "console":
-        click.echo(f"Ping report for {report['host']}")
-        click.echo(f"Sent: {report['count']}  Received: {report['received']}")
-        if report["received"]:
-            click.echo(
-                "RTT ms: "
-                f"min={report['min_ms']:.2f} "
-                f"avg={report['avg_ms']:.2f} "
-                f"max={report['max_ms']:.2f}"
-            )
-        else:
-            click.echo("No ICMP replies were parsed from ping output.")
+        click.echo(render_ping_console(report))
         return
 
     report_path = _export_report(
@@ -243,18 +121,12 @@ def traceroute_command(
     _validate_export_options(output_format, output_dir)
 
     try:
-        report = _build_traceroute_report(host, max_hops=max_hops, timeout=timeout)
-    except (RuntimeError, ValueError) as exc:
+        report = run_traceroute(host, max_hops=max_hops, timeout=timeout)
+    except (HIRError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
     if output_format == "console":
-        click.echo(f"Traceroute report for {report['host']}")
-        if not report["hops"]:
-            click.echo("No hops were parsed from traceroute output.")
-            return
-
-        for hop, ip, rtt in report["hops"]:
-            click.echo(f"{hop:>2}  {ip:<15}  {_format_rtt(rtt)}")
+        click.echo(render_traceroute_console(report))
         return
 
     report_path = _export_report(
@@ -286,22 +158,13 @@ def arp_scan_command(subnet: str, timeout: int, output_format: str, output_dir: 
     """Run an ARP scan against SUBNET."""
     _validate_export_options(output_format, output_dir)
 
-    report = _build_arp_report(subnet, timeout=timeout)
+    try:
+        report = run_arp_scan(subnet, timeout=timeout)
+    except (HIRError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
 
     if output_format == "console":
-        click.echo(f"ARP scan report for {report['subnet']}")
-        click.echo("OS results are heuristic guesses based on available network signals.")
-        if not report["devices"]:
-            click.echo("No devices were discovered.")
-            return
-
-        header = f"{'IP':<15} {'MAC':<17} {'Vendor':<20} Heuristic OS guess"
-        click.echo(header)
-        for device in report["devices"]:
-            click.echo(
-                f"{device['ip']:<15} {device['mac']:<17} "
-                f"{device['vendor']:<20} {device['os']}"
-            )
+        click.echo(render_arp_console(report))
         return
 
     report_path = _export_report(
@@ -328,12 +191,16 @@ def arp_scan_command(subnet: str, timeout: int, output_format: str, output_dir: 
 )
 def report_export_command(report_path: Path, output_dir: Path | None, base_filename: str | None) -> None:
     """Render a supported JSON report to HTML."""
-    report = _load_report_data(report_path)
-    html_path = render_html(
-        report,
-        base_filename=base_filename or report_path.stem,
-        directory=str(output_dir) if output_dir is not None else "results/html",
-    )
+    try:
+        report = load_report(report_path)
+        html_path = render_html(
+            report,
+            base_filename=base_filename or report_path.stem,
+            directory=output_dir if output_dir is not None else Path("results/html"),
+        )
+    except HIRError as exc:
+        raise click.ClickException(str(exc)) from exc
+
     click.echo(html_path)
 
 
