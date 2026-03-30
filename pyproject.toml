@@ -1,6 +1,63 @@
 [build-system]
-requires = ["setuptools>=61", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "hir"
+version = "0.1.0"
+description = "Early-stage Python CLI for conservative network diagnostics and report export."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Yussef Jurado", email = "u.sarnt@proton.me" },
+]
+keywords = ["arp", "cli", "network diagnostics", "ping", "traceroute"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Networking",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "click",
+    "Jinja2",
+    "scapy",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+build = ["build", "twine"]
+
+[project.urls]
+Homepage = "https://github.com/U-Sarnt/HIR"
+Repository = "https://github.com/U-Sarnt/HIR"
+Issues = "https://github.com/U-Sarnt/HIR/issues"
+Documentation = "https://github.com/U-Sarnt/HIR/tree/master/docs"
+
+[project.scripts]
+hir = "hir.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["hir*"]
+exclude = ["tests*", "results*"]
+
+[tool.setuptools.package-data]
+"hir.output" = ["templates/*.j2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

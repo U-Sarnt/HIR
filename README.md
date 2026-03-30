@@ -52,11 +52,22 @@ Prerequisites for live diagnostics:
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
+<<<<<<< Updated upstream
 python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
 ## Quick Usage
+=======
+pip install .
+```
+
+For local development, use `pip install -e ".[dev]"`.
+
+Packaging and release instructions live in [docs/PACKAGING_AND_RELEASES.md](docs/PACKAGING_AND_RELEASES.md).
+
+## CLI usage
+>>>>>>> Stashed changes
 
 ```bash
 hir --help
@@ -74,7 +85,11 @@ JSON and HTML exports print the generated file path to standard output. By defau
 On a clean Linux environment, validate the documented path with:
 
 ```bash
+<<<<<<< Updated upstream
 python -m pip install -e . pytest
+=======
+pip install -e ".[dev]"
+>>>>>>> Stashed changes
 hir --help
 hir ping --help
 hir traceroute --help
