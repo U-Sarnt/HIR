@@ -8,16 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from hir.core.errors import ParseError, ReportExportError
-from hir.core.models import (
-    ArpScanResult,
-    PingResult,
-    SupportedExportReport,
-    TracerouteResult,
-    parse_supported_report_payload,
-)
+from hir.core.models import SupportedExportReport
+from hir.output.contracts import JsonReport, coerce_report_document, parse_supported_report_document
 from hir.output.files import build_output_path, finalize_output_path
 
-SerializableReport = Mapping[str, Any] | PingResult | TracerouteResult | ArpScanResult
+SerializableReport = Mapping[str, Any] | JsonReport
 
 
 def dump_json(
@@ -26,7 +21,7 @@ def dump_json(
     directory: str | Path = "results/json",
 ) -> str:
     """Serialize a report payload to a sequential JSON file."""
-    payload = _coerce_json_payload(data)
+    payload = coerce_report_document(data)
     out_path = build_output_path(
         directory,
         base_filename=base_filename,
@@ -36,6 +31,7 @@ def dump_json(
 
     with out_path.open("w", encoding="utf-8") as output_file:
         json.dump(payload, output_file, indent=2, ensure_ascii=False)
+        output_file.write("\n")
 
     finalize_output_path(out_path)
     return str(out_path)
@@ -55,10 +51,4 @@ def load_report(report_path: str | Path) -> SupportedExportReport:
     if not isinstance(raw_data, dict):
         raise ParseError("Report file must contain a top-level JSON object.")
 
-    return parse_supported_report_payload(raw_data)
-
-
-def _coerce_json_payload(data: SerializableReport) -> dict[str, Any]:
-    if isinstance(data, Mapping):
-        return dict(data)
-    return data.to_dict()
+    return parse_supported_report_document(raw_data)

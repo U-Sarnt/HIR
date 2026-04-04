@@ -74,3 +74,19 @@ def test_report_export_renders_supported_json_report(tmp_path):
     assert "<title>Reporte Traceroute" in html
     assert "example.com" in html
     assert "192.168.1.1" in html
+
+
+def test_report_export_strips_existing_json_sequence_from_default_html_name(tmp_path):
+    report_path = tmp_path / "traceroute_example_com_01.json"
+    report_path.write_text(
+        json.dumps({"host": "example.com", "hops": [[1, "192.168.1.1", 1.23]]}),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        cli_mod.cli,
+        ["report-export", str(report_path), "--output-dir", str(tmp_path / "html")],
+    )
+
+    assert result.exit_code == 0
+    assert Path(result.output.strip()).name == "traceroute_example_com_01.html"

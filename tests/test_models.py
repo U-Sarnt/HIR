@@ -42,13 +42,47 @@ def test_ping_result_from_rtt_handles_missing_replies() -> None:
     assert result.max_ms is None
 
 
+def test_ping_result_from_payload_recomputes_derived_fields() -> None:
+    result = PingResult.from_payload(
+        {
+            "host": "1.1.1.1",
+            "count": 3,
+            "timeout": 1,
+            "rtt_ms": [10.0, 12.0, 8.0],
+            "received": 3,
+        }
+    )
+
+    assert result.received == 3
+    assert result.min_ms == 8.0
+    assert result.avg_ms == pytest.approx(10.0)
+    assert result.max_ms == 12.0
+
+
+def test_ping_result_from_payload_rejects_mismatched_received() -> None:
+    with pytest.raises(ParseError, match="must match the number of RTT values"):
+        PingResult.from_payload(
+            {
+                "host": "1.1.1.1",
+                "count": 2,
+                "timeout": 1,
+                "rtt_ms": [10.0],
+                "received": 2,
+            }
+        )
+
+
 def test_traceroute_result_round_trips_fixture(
     traceroute_payload: dict[str, Any],
     traceroute_result: TracerouteResult,
 ) -> None:
     assert traceroute_result.to_dict() == {
         **traceroute_payload,
-        "hops": [tuple(hop) for hop in traceroute_payload["hops"]],
+        "hops": [
+            {"hop": 1, "ip": "192.168.1.1", "rtt_ms": 1.23},
+            {"hop": 2, "ip": "203.0.113.10", "rtt_ms": 12.5},
+            {"hop": 3, "ip": "93.184.216.34", "rtt_ms": 23.45},
+        ],
     }
 
 
@@ -58,6 +92,12 @@ def test_traceroute_hop_from_payload_defaults_missing_rtt_to_nan() -> None:
     assert hop.hop == 3
     assert hop.ip == "203.0.113.10"
     assert math.isnan(hop.rtt_ms)
+
+
+def test_traceroute_hop_from_payload_accepts_mapping() -> None:
+    hop = TracerouteHop.from_payload({"hop": 3, "ip": "203.0.113.10", "rtt_ms": 7.5})
+
+    assert hop == TracerouteHop(hop=3, ip="203.0.113.10", rtt_ms=7.5)
 
 
 @pytest.mark.parametrize("payload", [[], ["hop-only"], ["one", "1.1.1.1", "slow"]])

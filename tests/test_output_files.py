@@ -3,7 +3,7 @@ from __future__ import annotations
 import stat
 from pathlib import Path
 
-from hir.output.files import build_output_path, finalize_output_path
+from hir.output.files import build_output_path, finalize_output_path, normalize_output_base_filename
 
 
 def test_build_output_path_creates_directory_and_counts_matching_suffixes(tmp_path: Path) -> None:
@@ -27,6 +27,20 @@ def test_build_output_path_creates_directory_and_counts_matching_suffixes(tmp_pa
         default_base_filename="",
     )
     assert next_path.name == "scan_02.json"
+
+
+def test_build_output_path_ignores_other_stems_when_incrementing(tmp_path: Path) -> None:
+    (tmp_path / "scan_01.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "other_99.json").write_text("{}", encoding="utf-8")
+
+    out_path = build_output_path(
+        tmp_path,
+        base_filename="scan",
+        suffix=".json",
+        default_base_filename="",
+    )
+
+    assert out_path.name == "scan_02.json"
 
 
 def test_finalize_output_path_sets_mode_and_sudo_owner(monkeypatch, tmp_path: Path) -> None:
@@ -58,3 +72,8 @@ def test_finalize_output_path_ignores_permission_errors(monkeypatch, tmp_path: P
     monkeypatch.setattr(Path, "chmod", raise_permission_error)
 
     finalize_output_path(path)
+
+
+def test_normalize_output_base_filename_strips_managed_sequence() -> None:
+    assert normalize_output_base_filename("traceroute_example_com_01") == "traceroute_example_com"
+    assert normalize_output_base_filename("traceroute_example_com") == "traceroute_example_com"

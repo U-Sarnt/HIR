@@ -72,6 +72,7 @@ hir report-export results/json/traceroute_example_com_01.json
 ```
 
 JSON and HTML exports print the generated file path to standard output. By default, exported files are written under `results/json` or `results/html`.
+Usage and runtime errors are written to standard error. The versioned JSON contract is documented in [docs/CLI_OUTPUT_CONTRACTS.md](docs/CLI_OUTPUT_CONTRACTS.md).
 
 ## Recommended Validation
 
@@ -108,6 +109,8 @@ hir report-export results/json/arp_scan_192_168_1_0_24_01.json
 - [docs/PHASE3_SUMMARY.md](docs/PHASE3_SUMMARY.md) summarizes the architecture refactor and remaining debt.
 - [docs/QUALITY_ASSURANCE.md](docs/QUALITY_ASSURANCE.md) describes the current test, lint, typing, coverage, and CI gates.
 - [docs/PHASE4_SUMMARY.md](docs/PHASE4_SUMMARY.md) records what phase 4 added and what quality debt remains.
+- [docs/CLI_OUTPUT_CONTRACTS.md](docs/CLI_OUTPUT_CONTRACTS.md) defines the stdout/stderr rules, exit codes, and versioned JSON contract.
+- [docs/PHASE5_SUMMARY.md](docs/PHASE5_SUMMARY.md) summarizes the CLI contract and output work completed in phase 5.
 
 ## License
 

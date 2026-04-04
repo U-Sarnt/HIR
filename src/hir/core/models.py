@@ -72,6 +72,26 @@ class PingResult:
             "max_ms": self.max_ms,
         }
 
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "PingResult":
+        """Build a typed ping result from JSON-like data."""
+        host = _require_string(payload, "host")
+        count = _required_int(payload, "count")
+        timeout = _required_int(payload, "timeout")
+        rtt_values = _require_float_sequence(payload, "rtt_ms")
+
+        result = cls.from_rtt(
+            host=host,
+            count=count,
+            timeout=timeout,
+            rtt_values=list(rtt_values),
+        )
+        received = payload.get("received")
+        if received is not None and _required_int(payload, "received") != result.received:
+            raise ParseError("Ping report field 'received' must match the number of RTT values.")
+
+        return result
+
 
 @dataclass(frozen=True, slots=True)
 class TracerouteHop:
@@ -85,11 +105,25 @@ class TracerouteHop:
         """Return the export-friendly tuple representation."""
         return (self.hop, self.ip, self.rtt_ms)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Return the stable JSON-serializable representation."""
+        return {
+            "hop": self.hop,
+            "ip": self.ip,
+            "rtt_ms": self.rtt_ms,
+        }
+
     @classmethod
     def from_payload(cls, payload: Any) -> "TracerouteHop":
-        """Build a hop from a stored JSON-compatible sequence."""
+        """Build a hop from a stored JSON-compatible object or sequence."""
+        if isinstance(payload, Mapping):
+            hop = _required_int(payload, "hop")
+            ip = _require_string(payload, "ip")
+            rtt_ms = _optional_float(payload.get("rtt_ms"), field_name="rtt_ms")
+            return cls(hop=hop, ip=ip, rtt_ms=float("nan") if rtt_ms is None else rtt_ms)
+
         if not isinstance(payload, (list, tuple)) or len(payload) < 2:
-            raise ParseError("Traceroute hops must be arrays like [hop, ip, rtt_ms].")
+            raise ParseError("Traceroute hops must be objects or arrays like [hop, ip, rtt_ms].")
 
         try:
             hop = int(payload[0])
@@ -116,7 +150,7 @@ class TracerouteResult:
             "host": self.host,
             "max_hops": self.max_hops,
             "timeout": self.timeout,
-            "hops": [hop.to_tuple() for hop in self.hops],
+            "hops": [hop.to_dict() for hop in self.hops],
         }
 
     @classmethod
@@ -250,3 +284,34 @@ def _optional_int(value: Any, field_name: str) -> int | None:
         return int(value)
     except (TypeError, ValueError) as exc:
         raise ParseError(f"Report field '{field_name}' must be an integer.") from exc
+
+
+def _required_int(payload: Mapping[str, Any], key: str) -> int:
+    value = payload.get(key)
+    if value is None:
+        raise ParseError(f"Report field '{key}' must be an integer.")
+
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise ParseError(f"Report field '{key}' must be an integer.") from exc
+
+
+def _optional_float(value: Any, field_name: str) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError) as exc:
+        raise ParseError(f"Report field '{field_name}' must be numeric.") from exc
+
+
+def _require_float_sequence(payload: Mapping[str, Any], key: str) -> tuple[float, ...]:
+    value = payload.get(key)
+    if not isinstance(value, list):
+        raise ParseError(f"Report field '{key}' must be an array of numeric RTT values.")
+
+    try:
+        return tuple(float(item) for item in value)
+    except (TypeError, ValueError) as exc:
+        raise ParseError(f"Report field '{key}' must be an array of numeric RTT values.") from exc

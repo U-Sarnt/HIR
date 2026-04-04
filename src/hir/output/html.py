@@ -10,7 +10,8 @@ from typing import Any
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 from hir.core.errors import ReportExportError
-from hir.core.models import ArpScanResult, TracerouteResult, parse_supported_report_payload
+from hir.core.models import ArpScanResult, TracerouteResult
+from hir.output.contracts import parse_supported_report_document
 from hir.output.files import build_output_path, finalize_output_path
 
 HtmlReport = Mapping[str, Any] | TracerouteResult | ArpScanResult
@@ -56,7 +57,7 @@ def _coerce_html_report(data: HtmlReport) -> TracerouteResult | ArpScanResult:
     if isinstance(data, (TracerouteResult, ArpScanResult)):
         return data
     if isinstance(data, Mapping):
-        return parse_supported_report_payload(dict(data))
+        return parse_supported_report_document(dict(data))
     raise ReportExportError("HTML export requires a traceroute or ARP report.")
 
 

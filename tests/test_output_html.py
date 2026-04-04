@@ -4,6 +4,7 @@ import pytest
 from jinja2 import TemplateNotFound
 
 import hir.output.html as html_mod
+from hir.output.contracts import REPORT_DOCUMENT_SCHEMA, REPORT_DOCUMENT_SCHEMA_VERSION
 from hir.output.html import render_html
 
 
@@ -80,6 +81,28 @@ def test_render_html_traceroute_template_does_not_depend_on_cwd(tmp_path, monkey
         {"host": "example.com", "hops": [(1, "192.168.1.1", 1.23)]},
         base_filename="traceroute_report",
         directory=str(tmp_path / "out"),
+    )
+
+    html = Path(out_path).read_text(encoding="utf-8")
+
+    assert "<title>Reporte Traceroute" in html
+    assert "example.com" in html
+    assert "192.168.1.1" in html
+
+
+def test_render_html_accepts_versioned_report_documents(tmp_path):
+    out_path = render_html(
+        {
+            "schema": REPORT_DOCUMENT_SCHEMA,
+            "schema_version": REPORT_DOCUMENT_SCHEMA_VERSION,
+            "report_type": "traceroute",
+            "report": {
+                "host": "example.com",
+                "hops": [{"hop": 1, "ip": "192.168.1.1", "rtt_ms": 1.23}],
+            },
+        },
+        base_filename="traceroute_report",
+        directory=str(tmp_path),
     )
 
     html = Path(out_path).read_text(encoding="utf-8")

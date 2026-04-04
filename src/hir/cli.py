@@ -7,6 +7,7 @@ from typing import Sequence
 
 import click
 
+from hir.cli_contracts import CLIOperationalError, CLIUsageError, ExitCode
 from hir.core.arp import run_arp_scan
 from hir.core.errors import HIRError
 from hir.core.models import ArpScanResult, PingResult, TracerouteResult
@@ -17,10 +18,11 @@ from hir.output.console import (
     render_ping_console,
     render_traceroute_console,
 )
+from hir.output.files import normalize_output_base_filename
 from hir.output.html import render_html
 from hir.output.json import dump_json, load_report
 
-_HELP_CONTEXT = {"help_option_names": ["-h", "--help"]}
+_HELP_CONTEXT = {"help_option_names": ["-h", "--help"], "max_content_width": 100}
 
 CoreReport = PingResult | TracerouteResult | ArpScanResult
 
@@ -32,7 +34,9 @@ def _slugify(value: str) -> str:
 
 def _validate_export_options(output_format: str, output_dir: Path | None) -> None:
     if output_format == "console" and output_dir is not None:
-        raise click.UsageError("--output-dir is only valid when exporting JSON or HTML.")
+        raise CLIUsageError(
+            "--output-dir can only be used with --format json or --format html."
+        )
 
 
 def _export_report(
@@ -58,7 +62,10 @@ def _export_report(
 
 @click.group(context_settings=_HELP_CONTEXT)
 def cli() -> None:
-    """HIR network diagnostics for the validated Python workflow."""
+    """Conservative network diagnostics for shell use and automation.
+
+    Command results are written to stdout. Usage errors and runtime failures are written to stderr.
+    """
 
 
 @cli.command("ping")
@@ -71,12 +78,13 @@ def cli() -> None:
     default="console",
     show_default=True,
     type=click.Choice(["console", "json"], case_sensitive=False),
+    help="Output mode. Console prints the report to stdout. JSON writes a file and prints its path.",
 )
 @click.option(
     "--output-dir",
     type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
     default=None,
-    help="Directory used for JSON exports.",
+    help="Destination directory for JSON exports.",
 )
 def ping_command(
     host: str,
@@ -91,7 +99,7 @@ def ping_command(
     try:
         report = run_ping(host, count=count, timeout=timeout)
     except (HIRError, ValueError) as exc:
-        raise click.ClickException(str(exc)) from exc
+        raise CLIOperationalError(str(exc)) from exc
 
     if output_format == "console":
         click.echo(render_ping_console(report))
@@ -116,12 +124,13 @@ def ping_command(
     default="console",
     show_default=True,
     type=click.Choice(["console", "json", "html"], case_sensitive=False),
+    help="Output mode. Console prints the report. JSON or HTML write a file and print its path.",
 )
 @click.option(
     "--output-dir",
     type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
     default=None,
-    help="Directory used for JSON or HTML exports.",
+    help="Destination directory for JSON or HTML exports.",
 )
 def traceroute_command(
     host: str,
@@ -136,7 +145,7 @@ def traceroute_command(
     try:
         report = run_traceroute(host, max_hops=max_hops, timeout=timeout)
     except (HIRError, ValueError) as exc:
-        raise click.ClickException(str(exc)) from exc
+        raise CLIOperationalError(str(exc)) from exc
 
     if output_format == "console":
         click.echo(render_traceroute_console(report))
@@ -160,12 +169,13 @@ def traceroute_command(
     default="console",
     show_default=True,
     type=click.Choice(["console", "json", "html"], case_sensitive=False),
+    help="Output mode. Console prints the report. JSON or HTML write a file and print its path.",
 )
 @click.option(
     "--output-dir",
     type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
     default=None,
-    help="Directory used for JSON or HTML exports.",
+    help="Destination directory for JSON or HTML exports.",
 )
 def arp_scan_command(
     subnet: str,
@@ -179,7 +189,7 @@ def arp_scan_command(
     try:
         report = run_arp_scan(subnet, timeout=timeout)
     except (HIRError, ValueError) as exc:
-        raise click.ClickException(str(exc)) from exc
+        raise CLIOperationalError(str(exc)) from exc
 
     if output_format == "console":
         click.echo(render_arp_console(report))
@@ -200,12 +210,12 @@ def arp_scan_command(
     "--output-dir",
     type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
     default=None,
-    help="Directory used for HTML exports.",
+    help="Destination directory for HTML exports.",
 )
 @click.option(
     "--base-filename",
     default=None,
-    help="Optional base filename for the generated HTML report.",
+    help="Optional base filename. HIR adds the numeric suffix automatically.",
 )
 def report_export_command(
     report_path: Path,
@@ -217,18 +227,36 @@ def report_export_command(
         report = load_report(report_path)
         html_path = render_html(
             report,
-            base_filename=base_filename or report_path.stem,
+            base_filename=base_filename or normalize_output_base_filename(report_path.stem),
             directory=output_dir if output_dir is not None else Path("results/html"),
         )
     except HIRError as exc:
-        raise click.ClickException(str(exc)) from exc
+        raise CLIOperationalError(str(exc)) from exc
 
     click.echo(html_path)
 
 
+def _run_cli(args: Sequence[str] | None = None) -> int:
+    """Run the HIR CLI and return the stable process exit code."""
+    argv = list(args) if args is not None else None
+
+    try:
+        cli.main(args=argv, prog_name="hir", standalone_mode=False)
+    except click.exceptions.Exit as exc:
+        return exc.exit_code
+    except click.ClickException as exc:
+        exc.show()
+        return exc.exit_code
+    except click.Abort:
+        click.echo("Aborted.", err=True)
+        return int(ExitCode.OPERATIONAL_ERROR)
+
+    return int(ExitCode.SUCCESS)
+
+
 def main(args: Sequence[str] | None = None) -> None:
     """Run the HIR CLI entry point."""
-    cli.main(args=list(args) if args is not None else None, prog_name="hir")
+    raise SystemExit(_run_cli(args))
 
 
 if __name__ == "__main__":

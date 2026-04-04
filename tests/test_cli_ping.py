@@ -5,6 +5,7 @@ import pytest
 from click.testing import CliRunner
 
 import hir.cli as cli_mod
+from hir.output.contracts import REPORT_DOCUMENT_SCHEMA, REPORT_DOCUMENT_SCHEMA_VERSION
 from hir.core.models import PingResult, TracerouteHop, TracerouteResult
 
 
@@ -18,6 +19,7 @@ def test_main_help_entry_path(capsys):
     assert "Usage: hir [OPTIONS] COMMAND [ARGS]..." in captured.out
     assert "arp-scan" in captured.out
     assert "report-export" in captured.out
+    assert captured.err == ""
 
 
 @pytest.mark.parametrize(
@@ -67,14 +69,19 @@ def test_ping_command_wires_backend_and_exports_json(monkeypatch, tmp_path):
     report_path = Path(result.output.strip())
     assert report_path.name == "ping_1_1_1_1_01.json"
     assert json.loads(report_path.read_text(encoding="utf-8")) == {
-        "host": "1.1.1.1",
-        "count": 2,
-        "timeout": 1,
-        "rtt_ms": [10.1, 12.3],
-        "received": 2,
-        "min_ms": 10.1,
-        "avg_ms": 11.2,
-        "max_ms": 12.3,
+        "schema": REPORT_DOCUMENT_SCHEMA,
+        "schema_version": REPORT_DOCUMENT_SCHEMA_VERSION,
+        "report_type": "ping",
+        "report": {
+            "host": "1.1.1.1",
+            "count": 2,
+            "timeout": 1,
+            "rtt_ms": [10.1, 12.3],
+            "received": 2,
+            "min_ms": 10.1,
+            "avg_ms": 11.2,
+            "max_ms": 12.3,
+        },
     }
 
 
