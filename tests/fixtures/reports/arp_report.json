@@ -1,0 +1,19 @@
+{
+  "subnet": "192.168.1.0/24",
+  "timeout": 1,
+  "os_note": "Los resultados de sistema operativo son heurísticos.",
+  "devices": [
+    {
+      "ip": "192.168.1.10",
+      "mac": "aa:bb:cc:dd:ee:ff",
+      "vendor": "Test Vendor",
+      "os": "Posible Linux/Unix (heurístico)"
+    },
+    {
+      "ip": "192.168.1.20",
+      "mac": "aa:bb:cc:dd:ee:00",
+      "vendor": "Desconocido",
+      "os": "Sin datos suficientes"
+    }
+  ]
+}

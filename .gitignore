@@ -11,6 +11,7 @@ src/hir.egg-info/
 
 results/
 htmlcov/
+coverage.xml
 
 .pytest_cache/
 .mypy_cache/

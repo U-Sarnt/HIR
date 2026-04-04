@@ -39,7 +39,11 @@ def parse_traceroute_line(line: str) -> TracerouteHop | None:
     return TracerouteHop(hop=hop, ip=ip, rtt_ms=rtt_ms)
 
 
-def traceroute_host(host: str, max_hops: int = 30, timeout: int = 2) -> list[tuple[int, str, float]]:
+def traceroute_host(
+    host: str,
+    max_hops: int = 30,
+    timeout: int = 2,
+) -> list[tuple[int, str, float]]:
     """Return the parsed traceroute hops as legacy tuples."""
     return [hop.to_tuple() for hop in run_traceroute(host, max_hops=max_hops, timeout=timeout).hops]
 
@@ -51,7 +55,8 @@ def run_traceroute(host: str, max_hops: int = 30, timeout: int = 2) -> Tracerout
         proc = subprocess.run(cmd, capture_output=True, text=True)
     except FileNotFoundError as exc:
         raise DependencyMissingError(
-            "El comando 'traceroute' no está instalado. Instálalo (p. ej. `sudo apt install traceroute`) y vuelve a intentarlo."
+            "El comando 'traceroute' no está instalado. "
+            "Instálalo (p. ej. `sudo apt install traceroute`) y vuelve a intentarlo."
         ) from exc
 
     if proc.returncode not in (0, 1):

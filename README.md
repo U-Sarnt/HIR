@@ -106,6 +106,8 @@ hir report-export results/json/arp_scan_192_168_1_0_24_01.json
 - [docs/PHASE2_SUMMARY.md](docs/PHASE2_SUMMARY.md) records packaging and release work from phase 2.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the current internal layout after the phase 3 cleanup.
 - [docs/PHASE3_SUMMARY.md](docs/PHASE3_SUMMARY.md) summarizes the architecture refactor and remaining debt.
+- [docs/QUALITY_ASSURANCE.md](docs/QUALITY_ASSURANCE.md) describes the current test, lint, typing, coverage, and CI gates.
+- [docs/PHASE4_SUMMARY.md](docs/PHASE4_SUMMARY.md) records what phase 4 added and what quality debt remains.
 
 ## License
 

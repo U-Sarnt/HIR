@@ -4,6 +4,7 @@ import hir.core.vendor as vendor_mod
 from hir.core.fingerprint import os_fingerprint_nmap
 from hir.core.vendor import OUI_DATABASE_UNAVAILABLE, get_vendor_from_mac, load_oui_database
 
+
 class Dummy:
     stdout = "OS details: TestOS 1.0"
 def fake_run(*args, **kwargs):

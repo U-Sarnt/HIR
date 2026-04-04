@@ -56,8 +56,7 @@ def os_fingerprint_ttl(ip: str) -> str:
     except FileNotFoundError:
         return UNKNOWN_OS
 
-    line = proc.stdout.splitlines()[-1] if proc.stdout else ""
-    match = re.search(r"ttl=(\d+)", line)
+    match = re.search(r"ttl=(\d+)", proc.stdout, re.IGNORECASE)
     if not match:
         return UNKNOWN_OS
 

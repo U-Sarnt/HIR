@@ -201,7 +201,11 @@ class ArpScanResult:
 
         timeout = _optional_int(payload.get("timeout"), field_name="timeout")
         os_note = _optional_string(payload.get("os_note")) or HEURISTIC_OS_NOTE
-        devices = tuple(ArpHost.from_payload(item) for item in raw_devices if isinstance(item, Mapping))
+        devices = tuple(
+            ArpHost.from_payload(item)
+            for item in raw_devices
+            if isinstance(item, Mapping)
+        )
 
         if len(devices) != len(raw_devices):
             raise ParseError("ARP report devices must be objects with ip and mac fields.")

@@ -26,10 +26,30 @@ python -m pip install -e ".[dev]"
 
 ## Tests and Validation
 
-Run the baseline checks before opening a pull request:
+Run the standard validation sequence before opening a pull request:
 
 ```bash
+python -m ruff check src tests
+python -m mypy
 python -m pytest -q
+python -m pytest --cov=hir --cov-report=term-missing --cov-report=xml -q
+rm -rf dist/
+python -m build
+python -m twine check dist/*
+hir --help
+hir ping --help
+hir traceroute --help
+hir arp-scan --help
+hir report-export --help
+```
+
+For full artifact smoke validation, install the built wheel in a clean virtual environment and rerun the CLI help checks:
+
+```bash
+python -m venv /tmp/hir-wheel-smoke
+. /tmp/hir-wheel-smoke/bin/activate
+python -m pip install --upgrade pip
+python -m pip install dist/*.whl
 hir --help
 hir ping --help
 hir traceroute --help

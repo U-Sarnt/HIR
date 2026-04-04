@@ -6,6 +6,7 @@ import csv
 from collections.abc import Iterator
 from importlib.resources import files
 from pathlib import Path
+from typing import IO
 
 OUI_DATABASE_UNAVAILABLE = "Base OUI no disponible"
 
@@ -49,11 +50,11 @@ def _iter_oui_rows(path: str | None) -> Iterator[tuple[str, str]]:
         return
 
     resource = files("hir.core").joinpath("oui.csv")
-    with resource.open("r", newline="", encoding="utf-8") as csv_file:
+    with resource.open("r", encoding="utf-8") as csv_file:
         yield from _read_oui_rows(csv_file)
 
 
-def _read_oui_rows(csv_file) -> Iterator[tuple[str, str]]:
+def _read_oui_rows(csv_file: IO[str]) -> Iterator[tuple[str, str]]:
     reader = csv.reader(csv_file)
     for row in reader:
         if len(row) < 2:

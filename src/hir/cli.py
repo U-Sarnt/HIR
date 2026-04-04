@@ -7,12 +7,16 @@ from typing import Sequence
 
 import click
 
+from hir.core.arp import run_arp_scan
 from hir.core.errors import HIRError
 from hir.core.models import ArpScanResult, PingResult, TracerouteResult
-from hir.core.arp import run_arp_scan
 from hir.core.ping import run_ping
 from hir.core.traceroute import run_traceroute
-from hir.output.console import render_arp_console, render_ping_console, render_traceroute_console
+from hir.output.console import (
+    render_arp_console,
+    render_ping_console,
+    render_traceroute_console,
+)
 from hir.output.html import render_html
 from hir.output.json import dump_json, load_report
 
@@ -45,6 +49,9 @@ def _export_report(
         directory = output_dir if output_dir is not None else Path("results/json")
         return dump_json(report, base_filename=base_filename, directory=directory)
 
+    if isinstance(report, PingResult):
+        raise ValueError("HTML export is only supported for traceroute and ARP reports.")
+
     directory = output_dir if output_dir is not None else Path("results/html")
     return render_html(report, base_filename=base_filename, directory=directory)
 
@@ -71,7 +78,13 @@ def cli() -> None:
     default=None,
     help="Directory used for JSON exports.",
 )
-def ping_command(host: str, count: int, timeout: int, output_format: str, output_dir: Path | None) -> None:
+def ping_command(
+    host: str,
+    count: int,
+    timeout: int,
+    output_format: str,
+    output_dir: Path | None,
+) -> None:
     """Run ICMP ping against HOST."""
     _validate_export_options(output_format, output_dir)
 
@@ -154,7 +167,12 @@ def traceroute_command(
     default=None,
     help="Directory used for JSON or HTML exports.",
 )
-def arp_scan_command(subnet: str, timeout: int, output_format: str, output_dir: Path | None) -> None:
+def arp_scan_command(
+    subnet: str,
+    timeout: int,
+    output_format: str,
+    output_dir: Path | None,
+) -> None:
     """Run an ARP scan against SUBNET."""
     _validate_export_options(output_format, output_dir)
 
@@ -189,7 +207,11 @@ def arp_scan_command(subnet: str, timeout: int, output_format: str, output_dir: 
     default=None,
     help="Optional base filename for the generated HTML report.",
 )
-def report_export_command(report_path: Path, output_dir: Path | None, base_filename: str | None) -> None:
+def report_export_command(
+    report_path: Path,
+    output_dir: Path | None,
+    base_filename: str | None,
+) -> None:
     """Render a supported JSON report to HTML."""
     try:
         report = load_report(report_path)

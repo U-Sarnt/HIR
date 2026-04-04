@@ -1,4 +1,5 @@
 import pytest
+
 from hir.core.errors import CommandExecutionError, DependencyMissingError
 from hir.core.ping import build_ping_command, parse_ping_line, ping_host
 

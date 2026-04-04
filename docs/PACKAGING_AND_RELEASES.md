@@ -68,15 +68,14 @@ hir --help
 
 ## GitHub workflows
 
-### Packaging workflow
+### Quality workflow
 
-`.github/workflows/packaging.yml` runs on branch pushes and pull requests. It:
+`.github/workflows/quality.yml` runs on pushes and pull requests. It:
 
-- builds the sdist and wheel
-- runs `twine check`
-- installs the wheel in a clean virtual environment
-- runs CLI help smoke checks
-- verifies `hir report-export` from the installed wheel so packaged templates are exercised
+- runs Ruff and scoped mypy checks on the `src/hir` codebase
+- runs the pytest suite on Ubuntu and macOS across Python 3.10, 3.11, and 3.12
+- produces coverage output and uploads the coverage artifacts from the canonical Ubuntu 3.12 job
+- builds the sdist and wheel, runs `twine check`, installs the wheel in a clean virtual environment, and runs CLI/report-export smoke checks
 
 ### Release workflow
 
