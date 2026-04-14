@@ -5,8 +5,8 @@ import pytest
 from click.testing import CliRunner
 
 import hir.cli as cli_mod
-from hir.output.contracts import REPORT_DOCUMENT_SCHEMA, REPORT_DOCUMENT_SCHEMA_VERSION
 from hir.core.models import PingResult, TracerouteHop, TracerouteResult
+from hir.output.contracts import REPORT_DOCUMENT_SCHEMA, REPORT_DOCUMENT_SCHEMA_VERSION
 
 
 def test_main_help_entry_path(capsys):
