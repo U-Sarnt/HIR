@@ -28,6 +28,64 @@ jobs:
       - name: Check package metadata
         run: python -m twine check dist/*
 
+      - name: Smoke test wheel artifact
+        run: |
+          rm -rf "$RUNNER_TEMP/hir-wheel-smoke"
+          python -m venv "$RUNNER_TEMP/hir-wheel-smoke"
+          . "$RUNNER_TEMP/hir-wheel-smoke/bin/activate"
+          python -m pip install --upgrade pip
+          python -m pip install dist/*.whl
+          python -m pip check
+          hir --version
+          python -m hir --version
+          hir --help
+          hir ping --help
+          hir traceroute --help
+          hir arp-scan --help
+          hir report-export --help
+          mkdir -p packaging-smoke
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report_path = Path("packaging-smoke/traceroute.json")
+          report_path.write_text(
+              json.dumps({"host": "example.com", "hops": [[1, "192.168.1.1", 1.23]]}),
+              encoding="utf-8",
+          )
+          PY
+          hir report-export packaging-smoke/traceroute.json --output-dir packaging-smoke/html
+          test -f packaging-smoke/html/traceroute_01.html
+
+      - name: Smoke test sdist artifact
+        run: |
+          rm -rf "$RUNNER_TEMP/hir-sdist-smoke"
+          python -m venv "$RUNNER_TEMP/hir-sdist-smoke"
+          . "$RUNNER_TEMP/hir-sdist-smoke/bin/activate"
+          python -m pip install --upgrade pip
+          python -m pip install dist/*.tar.gz
+          python -m pip check
+          hir --version
+          python -m hir --version
+          hir --help
+          hir ping --help
+          hir traceroute --help
+          hir arp-scan --help
+          hir report-export --help
+          mkdir -p packaging-smoke-sdist
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report_path = Path("packaging-smoke-sdist/traceroute.json")
+          report_path.write_text(
+              json.dumps({"host": "example.com", "hops": [[1, "192.168.1.1", 1.23]]}),
+              encoding="utf-8",
+          )
+          PY
+          hir report-export packaging-smoke-sdist/traceroute.json --output-dir packaging-smoke-sdist/html
+          test -f packaging-smoke-sdist/html/traceroute_01.html
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:

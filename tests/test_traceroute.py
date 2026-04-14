@@ -57,12 +57,12 @@ def test_traceroute_accepts_partial_results_with_returncode_one(monkeypatch):
 
 
 def test_traceroute_missing_binary_raises_clear_error(monkeypatch):
-    def raise_missing_binary(*args, **kwargs):
-        raise FileNotFoundError
+    monkeypatch.setattr("hir.core.traceroute.shutil.which", lambda _command: None)
 
-    monkeypatch.setattr("hir.core.traceroute.subprocess.run", raise_missing_binary)
-
-    with pytest.raises(DependencyMissingError, match="El comando 'traceroute' no está instalado"):
+    with pytest.raises(
+        DependencyMissingError,
+        match=r"Required system dependency 'traceroute' was not found in PATH",
+    ):
         traceroute_host("example.com")
 
 
