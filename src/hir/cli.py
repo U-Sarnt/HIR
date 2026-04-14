@@ -78,7 +78,10 @@ def cli() -> None:
     default="console",
     show_default=True,
     type=click.Choice(["console", "json"], case_sensitive=False),
-    help="Output mode. Console prints the report to stdout. JSON writes a file and prints its path.",
+    help=(
+        "Output mode. Console prints the report to stdout. "
+        "JSON writes a file and prints its path."
+    ),
 )
 @click.option(
     "--output-dir",
