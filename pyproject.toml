@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hir"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Early-stage Python CLI for conservative network diagnostics and report export."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
@@ -50,6 +50,7 @@ Homepage = "https://github.com/U-Sarnt/HIR"
 Repository = "https://github.com/U-Sarnt/HIR"
 Issues = "https://github.com/U-Sarnt/HIR/issues"
 Documentation = "https://github.com/U-Sarnt/HIR/tree/master/docs"
+Changelog = "https://github.com/U-Sarnt/HIR/blob/master/CHANGELOG.md"
 
 [project.scripts]
 hir = "hir.cli:main"
@@ -57,6 +58,9 @@ hir = "hir.cli:main"
 [tool.setuptools]
 package-dir = { "" = "src" }
 include-package-data = false
+
+[tool.setuptools.dynamic]
+version = { attr = "hir.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]

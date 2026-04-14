@@ -1,99 +1,52 @@
 # HIR Roadmap
 
-This roadmap describes the intended sequence for professionalizing HIR. The project is currently an early-stage Python CLI with a deliberately narrow public scope centered on `ping`, `traceroute`, `arp-scan`, and `report-export`.
+The staged professionalization plan for HIR is complete through phase 7. This document is now an
+archive of that sequence rather than an open-ended promise of future expansion.
 
-The ordering matters. Packaging, testing, architecture, and consistency come before broad feature expansion.
+Future work should be proposed through normal issue, milestone, and release planning instead of by
+extending the original phase ladder.
 
-## Direction
-
-- Keep HIR Python-first until the current CLI surface is reliable, testable, and consistently documented.
-- Treat documentation accuracy, installation correctness, and repository hygiene as foundation work rather than optional polish.
-- Distinguish validated diagnostics from heuristic enrichment in both code and public messaging.
-- Expand scope only when the existing workflow is stable on a clean environment.
-
-## Phase 1: Foundation Work
-
-Goal: establish a consistent and professional public identity for the repository.
-
-Focus areas:
-
-- make `README.md` the public source of truth for scope, limits, and usage
-- align `ROADMAP.md`, `CONTRIBUTING.md`, and `SECURITY.md` with the real project state
-- clean repository hygiene so local environments and generated artifacts are not tracked
-- align package metadata and repository-facing language with the validated Python CLI
-- remove or stop implying unsupported public promises
-
-## Phase 2: Reliability Work
-
-Goal: make the validated workflow dependable on a fresh setup.
-
-Focus areas:
-
-- verify that editable installation and CLI entry points work cleanly on a new Linux environment
-- strengthen automated tests around the validated commands and export paths
-- ensure packaged templates and supporting data are included and behave predictably
-- document platform assumptions, privilege requirements, and failure modes clearly
-- separate validated output from optional or heuristic enrichment more cleanly
-
-Exit criteria:
-
-- a clean install can run `hir --help` and the documented command help paths
-- the automated test suite covers the validated surface with confidence
-- documentation and CI reflect the same supported workflow
-
-## Phase 3: UX Work
-
-Goal: improve operator experience without widening scope prematurely.
-
-Focus areas:
-
-- make public CLI language and documentation consistently professional and clear
-- improve error handling, help text, and exit behavior for common failure cases
-- tighten output naming, report ergonomics, and validation examples
-- reduce ambiguity around experimental fields and unsupported workflows
-
-Exit criteria:
-
-- a new user can install HIR, run the validated commands, and understand the limits without reading the source
-
-## Phase 4: Network Feature Expansion
-
-Goal: expand capabilities cautiously after the existing baseline is stable.
-
-Focus areas:
-
-- add new diagnostics or report types only when they fit the conservative CLI model
-- improve structured output and report coverage incrementally
-- introduce additional network discovery features only with clear validation boundaries
-
-Guardrails:
-
-- no feature expansion that outpaces packaging, tests, or documentation
-- every new public command should define prerequisites, privilege requirements, and supported outputs
-
-## Phase 5: Plugin and Rust Work
-
-Goal: evaluate extensibility and performance work after the Python core is mature enough to justify it.
-
-Focus areas:
-
-- define whether a plugin model is actually needed and what stability guarantees it would require
-- measure real performance bottlenecks before proposing Rust acceleration
-- treat Rust or plugin work as optional, later-stage engineering decisions rather than current branding
-
-Guardrails:
-
-- do not market plugin or Rust support before design, packaging, and maintenance expectations are clear
-- keep the Python CLI as the validated public path until a broader architecture is proven
-
-## Sequence Summary
+## Completed Phase Sequence
 
 1. Foundation work
-2. Reliability work
-3. UX work
-4. Network feature expansion
-5. Plugin and Rust work
+   - public identity, repository hygiene, and scope alignment
+   - summary: [docs/PHASE1_SUMMARY.md](docs/PHASE1_SUMMARY.md)
+2. Packaging and releases
+   - packaging baseline, release workflows, and artifact construction
+   - summary: [docs/PHASE2_SUMMARY.md](docs/PHASE2_SUMMARY.md)
+3. Architecture cleanup
+   - internal module split, compatibility facade reduction, and clearer boundaries
+   - summary: [docs/PHASE3_SUMMARY.md](docs/PHASE3_SUMMARY.md)
+4. Quality and CI
+   - linting, typing, regression coverage, and CI quality gates
+   - summary: [docs/PHASE4_SUMMARY.md](docs/PHASE4_SUMMARY.md)
+5. CLI contracts and output stability
+   - stdout/stderr rules, exit codes, and versioned JSON contract
+   - summary: [docs/PHASE5_SUMMARY.md](docs/PHASE5_SUMMARY.md)
+6. Extensibility foundation
+   - plugin contracts, builtin capability registry, and controlled discovery model
+   - summary: [docs/PHASE6_SUMMARY.md](docs/PHASE6_SUMMARY.md)
+7. Release readiness and hardening
+   - support posture, final packaging validation, versioning discipline, and roadmap closure
+   - summary: [docs/PHASE7_SUMMARY.md](docs/PHASE7_SUMMARY.md)
 
-## Contribution Alignment
+## Post-Phase-7 Baseline
 
-Contributions should match the current phase priorities. For the present workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
+The project should continue with these constraints unless a future release explicitly changes them:
+
+- keep HIR Python-first and conservative
+- treat Linux as the validated environment for live diagnostics
+- preserve the stabilized CLI contract unless a change is intentional and documented
+- prefer packaging, compatibility, and operational clarity over broad feature growth
+- document support limits explicitly instead of implying broader guarantees
+
+## Future Work After the Phased Plan
+
+Possible future work is not banned, but it is intentionally outside the closed phase plan:
+
+- new diagnostics that fit the conservative CLI model
+- broader release engineering such as signed artifacts or trusted publishing
+- deeper plugin commitments only after explicit compatibility decisions
+- broader platform support only after real validation, documentation, and maintenance commitment
+
+No future work should be marketed as part of the original professionalization roadmap by default.

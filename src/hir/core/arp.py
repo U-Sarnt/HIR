@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import platform
+
 from scapy.all import ARP, Ether, srp
 
 from hir.core.errors import HIRError, PrivilegeRequiredError
@@ -42,6 +44,7 @@ def run_arp_scan(subnet: str, timeout: int = 1) -> ArpScanResult:
 def scan_arp_hosts(subnet: str, timeout: int = 1) -> list[ArpHost]:
     """Discover hosts on a subnet using a broadcast ARP request."""
     _validate_arp_params(subnet, timeout)
+    _validate_arp_runtime()
 
     packet = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=subnet)
 
@@ -69,6 +72,14 @@ def _validate_arp_params(subnet: str, timeout: int) -> None:
         raise ValueError("La subred no puede estar vacía.")
     if timeout < 1:
         raise ValueError("El timeout debe ser mayor o igual que 1.")
+
+
+def _validate_arp_runtime() -> None:
+    if platform.system() == "Windows":
+        raise HIRError(
+            "ARP scan is not supported on Windows in the validated HIR workflow. "
+            "Use Linux for live ARP discovery."
+        )
 
 
 def _is_privilege_error(exc: BaseException) -> bool:

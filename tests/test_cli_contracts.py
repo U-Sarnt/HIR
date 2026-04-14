@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 import hir.cli as cli_mod
+from hir import __version__
 from hir.cli_contracts import ExitCode
 from hir.core.errors import PrivilegeRequiredError
 from hir.core.models import PingResult
@@ -19,6 +20,17 @@ def test_help_writes_only_to_stdout(capsys) -> None:
 
     assert exc_info.value.code == ExitCode.SUCCESS
     assert "Usage: hir [OPTIONS] COMMAND [ARGS]..." in captured.out
+    assert captured.err == ""
+
+
+def test_version_writes_only_to_stdout(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        cli_mod.main(["--version"])
+
+    captured = capsys.readouterr()
+
+    assert exc_info.value.code == ExitCode.SUCCESS
+    assert captured.out.strip() == f"hir, version {__version__}"
     assert captured.err == ""
 
 

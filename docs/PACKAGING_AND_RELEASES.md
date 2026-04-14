@@ -5,6 +5,7 @@
 HIR now uses `pyproject.toml` as the single packaging source of truth.
 
 - Metadata is defined with PEP 621 in `pyproject.toml`.
+- The public version is sourced from `hir.__version__` so runtime reporting and distribution metadata stay aligned.
 - `setuptools.build_meta` remains the build backend.
 - The repository keeps the existing `src/` layout.
 - Runtime package data is declared explicitly for the bundled HTML templates used by `hir report-export`.
@@ -29,7 +30,7 @@ This produces:
 
 ## Local artifact validation
 
-Validate metadata and install the wheel in a clean environment:
+Validate metadata and install both artifact types in clean environments:
 
 ```bash
 python3 -m twine check dist/*
@@ -37,6 +38,9 @@ python3 -m venv /tmp/hir-wheel-smoke
 . /tmp/hir-wheel-smoke/bin/activate
 python3 -m pip install --upgrade pip
 python3 -m pip install dist/*.whl
+python3 -m pip check
+hir --version
+python3 -m hir --version
 hir --help
 hir ping --help
 hir traceroute --help
@@ -54,17 +58,21 @@ report_path.write_text(
 )
 PY
 hir report-export /tmp/hir-wheel-report/traceroute.json --output-dir /tmp/hir-wheel-report/html
-```
-
-If you also want to verify installation from the source distribution:
-
-```bash
 python3 -m venv /tmp/hir-sdist-smoke
 . /tmp/hir-sdist-smoke/bin/activate
 python3 -m pip install --upgrade pip
 python3 -m pip install dist/*.tar.gz
+python3 -m pip check
+hir --version
+python3 -m hir --version
 hir --help
+hir ping --help
+hir traceroute --help
+hir arp-scan --help
+hir report-export --help
 ```
+
+Treat [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md) as the final release checklist before tagging.
 
 ## GitHub workflows
 
@@ -76,6 +84,7 @@ hir --help
 - runs the pytest suite on Ubuntu and macOS across Python 3.10, 3.11, and 3.12
 - produces coverage output and uploads the coverage artifacts from the canonical Ubuntu 3.12 job
 - builds the sdist and wheel, runs `twine check`, installs the wheel in a clean virtual environment, and runs CLI/report-export smoke checks
+- repeats the install-and-smoke path from the source distribution in a separate clean virtual environment
 
 ### Release workflow
 
@@ -83,6 +92,7 @@ hir --help
 
 - builds the sdist and wheel
 - runs `twine check`
+- smoke-tests the wheel and sdist before publication
 - creates or updates a GitHub Release and attaches the built artifacts
 
 The release workflow does not assume PyPI credentials.
@@ -105,10 +115,10 @@ Manual setup still required:
 
 ## Intentionally deferred
 
-The following items remain for later phases:
+The following items remain deliberately deferred:
 
 - deep CLI redesign or architecture refactors
 - wider CI matrix expansion
 - bundling a real OUI vendor database that is not currently present in the repository
 - PyPI publication activation before trusted publishing is configured
-- broader release management concerns such as changelog automation or signed artifacts
+- signed artifacts, provenance, or other higher-assurance release automation

@@ -26,6 +26,7 @@ Internally, HIR now also includes a conservative plugin and capability registry 
 - HIR is early-stage and should be treated as a narrow CLI utility, not as a broad network platform.
 - The validated workflow today is Python-first and Linux-oriented. `ping` and `traceroute` must be available in `PATH` and compatible with the flags HIR uses.
 - `hir arp-scan` requires root privileges or equivalent raw-socket capabilities such as `CAP_NET_RAW` or `CAP_NET_ADMIN`.
+- Windows is outside the validated live-diagnostics workflow. macOS should be treated as best-effort for live command execution.
 - Ping can export JSON, but HTML rendering is currently limited to traceroute and ARP reports.
 - ARP output may include vendor labels and operating system guesses, but those fields are not part of the validated diagnostic core.
 - The plugin foundation is currently aimed at maintainers and controlled extensions, not at a broad public plugin ecosystem.
@@ -46,6 +47,8 @@ Internally, HIR now also includes a conservative plugin and capability registry 
 
 HIR currently targets Python 3.10 or newer.
 
+Validated support today is Python 3.10-3.12 on Linux. For best-effort and unsupported cases, see [docs/SUPPORT_AND_COMPATIBILITY.md](docs/SUPPORT_AND_COMPATIBILITY.md).
+
 Prerequisites for live diagnostics:
 
 - `ping` available in `PATH`
@@ -57,16 +60,19 @@ python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e .
+hir --version
+python -m hir --help
 ```
 
 For local development, use `pip install -e ".[dev]"`.
 
-Packaging and release instructions live in [docs/PACKAGING_AND_RELEASES.md](docs/PACKAGING_AND_RELEASES.md).
+Packaging and release instructions live in [docs/PACKAGING_AND_RELEASES.md](docs/PACKAGING_AND_RELEASES.md). The release baseline and checklist are documented in [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md).
 
 ## CLI usage
 
 ```bash
 hir --help
+hir --version
 hir ping 1.1.1.1
 hir ping 1.1.1.1 --format json
 hir traceroute example.com --format html
@@ -83,6 +89,8 @@ On a clean Linux environment, validate the documented path with:
 
 ```bash
 python -m pip install -e ".[dev]"
+hir --version
+python -m hir --version
 hir --help
 hir ping --help
 hir traceroute --help
@@ -102,7 +110,8 @@ hir report-export results/json/arp_scan_192_168_1_0_24_01.json
 
 ## Project Documents
 
-- [ROADMAP.md](ROADMAP.md) explains the staged direction of the project.
+- [CHANGELOG.md](CHANGELOG.md) records user-visible release and compatibility changes.
+- [ROADMAP.md](ROADMAP.md) records the completed staged professionalization plan and the post-phase-7 baseline.
 - [CONTRIBUTING.md](CONTRIBUTING.md) describes the current contributor workflow.
 - [SECURITY.md](SECURITY.md) explains how to report vulnerabilities.
 - [docs/PROJECT_POSITIONING.md](docs/PROJECT_POSITIONING.md) summarizes the public positioning.
@@ -116,6 +125,9 @@ hir report-export results/json/arp_scan_192_168_1_0_24_01.json
 - [docs/PHASE5_SUMMARY.md](docs/PHASE5_SUMMARY.md) summarizes the CLI contract and output work completed in phase 5.
 - [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md) documents the current extensibility architecture and its deliberate limits.
 - [docs/PHASE6_SUMMARY.md](docs/PHASE6_SUMMARY.md) summarizes the plugin foundation added in phase 6.
+- [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md) defines what release-ready means for HIR and the final validation checklist.
+- [docs/SUPPORT_AND_COMPATIBILITY.md](docs/SUPPORT_AND_COMPATIBILITY.md) records the current support matrix, privilege requirements, and best-effort boundaries.
+- [docs/PHASE7_SUMMARY.md](docs/PHASE7_SUMMARY.md) summarizes the final release-readiness and hardening work.
 
 ## License
 

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import platform
 import re
+import shutil
 import subprocess
 
 from hir.core.errors import CommandExecutionError, DependencyMissingError
@@ -51,13 +53,12 @@ def traceroute_host(
 def run_traceroute(host: str, max_hops: int = 30, timeout: int = 2) -> TracerouteResult:
     """Run `traceroute` and return a structured result model."""
     cmd = build_traceroute_command(host, max_hops=max_hops, timeout=timeout)
+    if shutil.which("traceroute") is None:
+        raise _missing_traceroute_dependency_error()
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
     except FileNotFoundError as exc:
-        raise DependencyMissingError(
-            "El comando 'traceroute' no está instalado. "
-            "Instálalo (p. ej. `sudo apt install traceroute`) y vuelve a intentarlo."
-        ) from exc
+        raise _missing_traceroute_dependency_error() from exc
 
     if proc.returncode not in (0, 1):
         error = proc.stderr.strip() or proc.stdout.strip()
@@ -78,3 +79,18 @@ def _validate_traceroute_params(host: str, max_hops: int, timeout: int) -> None:
         raise ValueError("La cantidad máxima de saltos debe ser mayor o igual que 1.")
     if timeout < 1:
         raise ValueError("El timeout debe ser mayor o igual que 1.")
+
+
+def _missing_traceroute_dependency_error() -> DependencyMissingError:
+    platform_note = ""
+    if platform.system() != "Linux":
+        platform_note = (
+            " HIR validates live diagnostics primarily on Linux; non-Linux runtimes are "
+            "best-effort."
+        )
+    return DependencyMissingError(
+        "Required system dependency 'traceroute' was not found in PATH. "
+        "HIR uses the system traceroute binary for live path diagnostics. "
+        "Install the OS package that provides 'traceroute' and retry."
+        f"{platform_note}"
+    )

@@ -41,12 +41,12 @@ def test_ping_failure(monkeypatch):
 
 
 def test_ping_missing_binary_reports_clear_error(monkeypatch):
-    def raise_missing_binary(*args, **kwargs):
-        raise FileNotFoundError
+    monkeypatch.setattr("hir.core.ping.shutil.which", lambda _command: None)
 
-    monkeypatch.setattr("hir.core.ping.subprocess.run", raise_missing_binary)
-
-    with pytest.raises(DependencyMissingError, match="El comando 'ping' no está instalado"):
+    with pytest.raises(
+        DependencyMissingError,
+        match=r"Required system dependency 'ping' was not found in PATH",
+    ):
         ping_host("1.1.1.1", count=1, timeout=1)
 
 

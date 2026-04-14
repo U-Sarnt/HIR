@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import platform
+import shutil
 import subprocess
 from collections.abc import Iterable, Iterator
 from typing import NamedTuple
@@ -79,13 +81,13 @@ def ping_host(host: str, count: int = 4, timeout: int = 2) -> list[float]:
 def run_ping(host: str, count: int = 4, timeout: int = 2) -> PingResult:
     """Run `ping` and return a structured result model."""
     cmd = build_ping_command(host, count=count, timeout=timeout)
+    if shutil.which("ping") is None:
+        raise _missing_ping_dependency_error()
 
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
     except FileNotFoundError as exc:
-        raise DependencyMissingError(
-            "El comando 'ping' no está instalado o no está disponible en PATH."
-        ) from exc
+        raise _missing_ping_dependency_error() from exc
 
     if proc.returncode != 0:
         error = proc.stderr.strip() or proc.stdout.strip()
@@ -97,3 +99,18 @@ def run_ping(host: str, count: int = 4, timeout: int = 2) -> PingResult:
         if reply.time_ms is not None
     ]
     return PingResult.from_rtt(host=host, count=count, timeout=timeout, rtt_values=rtt_values)
+
+
+def _missing_ping_dependency_error() -> DependencyMissingError:
+    platform_note = ""
+    if platform.system() != "Linux":
+        platform_note = (
+            " HIR validates live diagnostics primarily on Linux; non-Linux runtimes are "
+            "best-effort."
+        )
+    return DependencyMissingError(
+        "Required system dependency 'ping' was not found in PATH. "
+        "HIR uses the system ping binary for live ping diagnostics. "
+        "Install the OS package that provides 'ping' and retry."
+        f"{platform_note}"
+    )

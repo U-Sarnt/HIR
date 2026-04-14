@@ -10,13 +10,16 @@ HIR phase 4 adds explicit quality gates around the validated Python CLI workflow
 - Coverage is measured with `pytest-cov` against the `hir` package.
 - Coverage currently fails below `85%`.
 - Build validation uses `python -m build` and `python -m twine check dist/*`.
-- Artifact smoke validation installs the wheel into a clean virtual environment and runs:
+- Artifact smoke validation installs both the wheel and sdist into clean virtual environments and runs:
+  - `python -m pip check`
+  - `hir --version`
+  - `python -m hir --version`
   - `hir --help`
   - `hir ping --help`
   - `hir traceroute --help`
   - `hir arp-scan --help`
   - `hir report-export --help`
-- The packaging smoke path also verifies `hir report-export` from the installed wheel so packaged templates are exercised.
+- The packaging smoke path also verifies `hir report-export` from installed artifacts so packaged templates are exercised.
 
 ## Test Organization
 
@@ -25,6 +28,7 @@ HIR phase 4 adds explicit quality gates around the validated Python CLI workflow
 - `tests/test_models.py`, `tests/test_errors.py`, `tests/test_arp.py`, `tests/test_vendor.py`, and `tests/test_fingerprint.py` cover the refactored core modules added in phase 3.
 - `tests/test_output_console.py`, `tests/test_output_json.py`, `tests/test_output_json_loading.py`, and `tests/test_output_html.py` cover console rendering, JSON/HTML export, report loading, and file generation behavior.
 - `tests/test_output_files.py` covers sequential file naming and post-write permission handling.
+- `tests/test_release_readiness.py` covers installed metadata/version alignment and the `python -m hir` entry path.
 - Representative report payloads live under `tests/fixtures/reports/`.
 
 ## CI Validation
@@ -33,8 +37,8 @@ HIR phase 4 adds explicit quality gates around the validated Python CLI workflow
 
 - `quality-gates` runs on Ubuntu with Python 3.12 and executes Ruff, mypy, and pytest with coverage reporting.
 - `test-matrix` runs pytest on Ubuntu and macOS across Python 3.10, 3.11, and 3.12.
-- `package-smoke` builds the package, checks metadata, installs the wheel into a clean environment, and runs CLI help plus report-export smoke checks.
-- `.github/workflows/release.yml` remains tag-driven and focuses on building release artifacts and attaching them to GitHub Releases.
+- `package-smoke` builds the package, checks metadata, installs both artifact types into clean environments, and runs version/help/report-export smoke checks.
+- `.github/workflows/release.yml` remains tag-driven and now smoke-tests the built artifacts before attaching them to GitHub Releases.
 
 ## Local Validation
 
@@ -48,6 +52,8 @@ python -m pytest --cov=hir --cov-report=term-missing --cov-report=xml -q
 rm -rf dist/
 python -m build
 python -m twine check dist/*
+hir --version
+python -m hir --version
 hir --help
 hir ping --help
 hir traceroute --help
@@ -55,7 +61,9 @@ hir arp-scan --help
 hir report-export --help
 ```
 
-For a clean wheel-install smoke test, use the sequence documented in [docs/PACKAGING_AND_RELEASES.md](docs/PACKAGING_AND_RELEASES.md).
+For clean wheel and sdist install smoke tests, use the sequences in
+[docs/PACKAGING_AND_RELEASES.md](docs/PACKAGING_AND_RELEASES.md) and
+[docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md).
 
 ## Intentionally Deferred
 

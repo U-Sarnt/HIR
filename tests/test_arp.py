@@ -79,6 +79,13 @@ def test_scan_arp_hosts_wraps_other_runtime_errors(monkeypatch) -> None:
         arp_mod.scan_arp_hosts("192.168.1.0/24")
 
 
+def test_scan_arp_hosts_rejects_windows_runtime(monkeypatch) -> None:
+    monkeypatch.setattr(arp_mod.platform, "system", lambda: "Windows")
+
+    with pytest.raises(HIRError, match="not supported on Windows"):
+        arp_mod.scan_arp_hosts("192.168.1.0/24")
+
+
 def test_run_arp_scan_enriches_results_and_tolerates_fingerprint_failures(monkeypatch) -> None:
     monkeypatch.setattr(
         arp_mod,

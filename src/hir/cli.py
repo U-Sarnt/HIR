@@ -7,6 +7,7 @@ from typing import Sequence, cast
 
 import click
 
+from hir import __version__
 from hir.cli_contracts import CLIOperationalError, CLIUsageError, ExitCode
 from hir.core.errors import HIRError
 from hir.core.models import ArpScanResult, PingResult, TracerouteResult
@@ -61,6 +62,7 @@ def _dispatch_output(
 
 
 @click.group(context_settings=_HELP_CONTEXT)
+@click.version_option(version=__version__, prog_name="hir")
 def cli() -> None:
     """Conservative network diagnostics for shell use and automation.
 
