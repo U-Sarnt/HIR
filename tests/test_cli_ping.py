@@ -41,11 +41,17 @@ def test_subcommand_help(args, expected_text):
 def test_ping_command_wires_backend_and_exports_json(monkeypatch, tmp_path):
     seen: dict[str, object] = {}
 
-    def fake_run_ping(host: str, count: int, timeout: int) -> PingResult:
-        seen["args"] = (host, count, timeout)
-        return PingResult.from_rtt(host=host, count=count, timeout=timeout, rtt_values=[10.1, 12.3])
+    def fake_run_provider(name: str, **kwargs: object) -> PingResult:
+        assert name == "ping"
+        seen["args"] = (kwargs["host"], kwargs["count"], kwargs["timeout"])
+        return PingResult.from_rtt(
+            host=str(kwargs["host"]),
+            count=int(kwargs["count"]),
+            timeout=int(kwargs["timeout"]),
+            rtt_values=[10.1, 12.3],
+        )
 
-    monkeypatch.setattr(cli_mod, "run_ping", fake_run_ping)
+    monkeypatch.setattr(cli_mod, "_run_provider", fake_run_provider)
 
     result = CliRunner().invoke(
         cli_mod.cli,
@@ -88,16 +94,17 @@ def test_ping_command_wires_backend_and_exports_json(monkeypatch, tmp_path):
 def test_traceroute_command_wires_backend(monkeypatch):
     seen: dict[str, object] = {}
 
-    def fake_run_traceroute(host: str, max_hops: int, timeout: int) -> TracerouteResult:
-        seen["args"] = (host, max_hops, timeout)
+    def fake_run_provider(name: str, **kwargs: object) -> TracerouteResult:
+        assert name == "traceroute"
+        seen["args"] = (kwargs["host"], kwargs["max_hops"], kwargs["timeout"])
         return TracerouteResult(
-            host=host,
-            max_hops=max_hops,
-            timeout=timeout,
+            host=str(kwargs["host"]),
+            max_hops=int(kwargs["max_hops"]),
+            timeout=int(kwargs["timeout"]),
             hops=(TracerouteHop(1, "192.168.1.1", 1.23),),
         )
 
-    monkeypatch.setattr(cli_mod, "run_traceroute", fake_run_traceroute)
+    monkeypatch.setattr(cli_mod, "_run_provider", fake_run_provider)
 
     result = CliRunner().invoke(
         cli_mod.cli,

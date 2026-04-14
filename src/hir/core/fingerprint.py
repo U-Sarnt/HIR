@@ -86,19 +86,16 @@ def os_fingerprint_snmp(ip: str) -> str:
 
 
 def hybrid_os_fingerprint(ip: str) -> str:
-    """Return the first non-empty heuristic OS guess available."""
-    for detector in (
-        os_fingerprint_nmap,
-        os_fingerprint_scapy,
-        os_fingerprint_ttl,
-        os_fingerprint_snmp,
-    ):
+    """Return the first non-empty heuristic OS guess from the registry chain."""
+    from hir.plugins.runtime import get_runtime_registry
+
+    for provider in get_runtime_registry().iter_os_fingerprint_providers():
         try:
-            result = detector(ip)
+            result = provider.detector(ip)
         except Exception:
             continue
 
-        if result != UNKNOWN_OS:
+        if result and result != UNKNOWN_OS:
             return result
 
     return UNKNOWN_OS

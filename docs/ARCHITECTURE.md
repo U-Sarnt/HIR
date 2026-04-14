@@ -24,6 +24,13 @@ src/hir/
     ping.py
     traceroute.py
     vendor.py
+  plugins/
+    __init__.py
+    builtins.py
+    contracts.py
+    discovery.py
+    registry.py
+    runtime.py
   output/
     __init__.py
     console.py
@@ -66,11 +73,31 @@ The CLI should not contain discovery logic, parsing logic, or template/file outp
 
 - `src/hir/core/vendor.py`
   - loads the optional OUI data source
-  - resolves MAC prefixes to vendor labels
+  - resolves MAC prefixes through the registered vendor-resolver chain
+  - still owns the builtin OUI lookup implementation
 
 - `src/hir/core/fingerprint.py`
   - contains best-effort OS fingerprint heuristics
+  - resolves the heuristic chain through the registered fingerprint providers
   - keeps heuristic probes isolated from CLI and rendering code
+
+### Plugin/runtime layer
+
+- `src/hir/plugins/contracts.py`
+  - defines explicit plugin metadata and capability contracts
+
+- `src/hir/plugins/registry.py`
+  - owns capability registration, lookup, uniqueness rules, and traceability
+
+- `src/hir/plugins/discovery.py`
+  - registers builtin plugins explicitly
+  - optionally discovers third-party plugins from Python entry points
+
+- `src/hir/plugins/runtime.py`
+  - caches the discovered registry used by CLI and enrichment/runtime flows
+
+- `src/hir/plugins/builtins.py`
+  - registers the builtin acquisition, output, loader, and enrichment capabilities
 
 - `src/hir/core/models.py`
   - defines lightweight dataclasses for validated report shapes
@@ -118,6 +145,8 @@ HIR currently touches the host system in a few explicit places:
 
 Keeping these integrations easy to spot makes future testing and portability work simpler.
 
+The plugin foundation does not add new system-facing integrations by itself. It centralizes how existing integrations are registered and resolved.
+
 ## Data and Error Boundaries
 
 The main command results are represented with dataclasses:
@@ -144,6 +173,7 @@ This gives the CLI and future tests a clearer contract.
 - Keep `cli.py` thin. Click commands should orchestrate, not implement diagnostics.
 - Keep domain logic close to the system integration it depends on.
 - Keep rendering and export logic in `hir.output`, not in the discovery modules.
+- Keep plugin registration declarative and capability-oriented. Do not hide builtin behavior behind implicit imports.
 - Use typed dataclasses at module boundaries when a command returns structured data.
 - Prefer explicit exceptions for expected operational failures.
 - Preserve the validated public workflow before adding broader abstractions.
@@ -153,6 +183,7 @@ This gives the CLI and future tests a clearer contract.
 
 - Add new command behavior by introducing or extending a domain module under `hir.core`, then wiring it through `hir.cli`.
 - Add new export behavior under `hir.output`; do not mix template/file logic into CLI or probe code.
+- Register new extensibility points through `hir.plugins.builtins` or a dedicated plugin module instead of wiring more direct imports into `cli.py`.
 - If a legacy shim such as `core/network.py` is still needed, keep it thin and avoid putting new feature logic there.
 - Treat heuristic enrichment as optional and best-effort. Do not present it as validated ground truth.
 - Keep packaging assumptions intact: templates remain package data, and the `hir` entry point remains `hir.cli:main`.

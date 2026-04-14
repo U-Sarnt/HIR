@@ -9,14 +9,15 @@ from hir.core.models import ArpHost, ArpScanResult
 
 
 def test_arp_scan_permission_failure_is_actionable(monkeypatch):
-    def raise_permission_error(_subnet: str, timeout: int) -> ArpScanResult:
+    def raise_permission_error(name: str, **_kwargs: object) -> ArpScanResult:
+        assert name == "arp-scan"
         raise PrivilegeRequiredError(
             "ARP scan requires root privileges or raw-socket capabilities "
             "(CAP_NET_RAW/CAP_NET_ADMIN). Re-run with sudo or grant the "
             "required capabilities to the Python environment."
         )
 
-    monkeypatch.setattr(cli_mod, "run_arp_scan", raise_permission_error)
+    monkeypatch.setattr(cli_mod, "_run_provider", raise_permission_error)
 
     result = CliRunner().invoke(cli_mod.cli, ["arp-scan", "192.168.1.0/24"])
 
@@ -29,10 +30,10 @@ def test_arp_scan_permission_failure_is_actionable(monkeypatch):
 def test_arp_scan_console_keeps_os_wording_honest(monkeypatch):
     monkeypatch.setattr(
         cli_mod,
-        "run_arp_scan",
-        lambda _subnet, timeout: ArpScanResult(
+        "_run_provider",
+        lambda name, **kwargs: ArpScanResult(
             subnet="192.168.1.0/24",
-            timeout=timeout,
+            timeout=int(kwargs["timeout"]),
             devices=(
                 ArpHost(
                     ip="192.168.1.10",

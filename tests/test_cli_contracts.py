@@ -34,10 +34,11 @@ def test_usage_errors_use_stderr_and_stable_exit_code(tmp_path: Path, capsys) ->
 
 
 def test_runtime_errors_use_stderr_and_stable_exit_code(monkeypatch, capsys) -> None:
-    def raise_runtime_error(host: str, count: int, timeout: int) -> PingResult:
+    def raise_runtime_error(name: str, **_kwargs: object) -> PingResult:
+        assert name == "ping"
         raise PrivilegeRequiredError("root privileges are required")
 
-    monkeypatch.setattr(cli_mod, "run_ping", raise_runtime_error)
+    monkeypatch.setattr(cli_mod, "_run_provider", raise_runtime_error)
 
     with pytest.raises(SystemExit) as exc_info:
         cli_mod.main(["ping", "127.0.0.1"])
@@ -50,10 +51,16 @@ def test_runtime_errors_use_stderr_and_stable_exit_code(monkeypatch, capsys) -> 
 
 
 def test_json_export_stdout_contains_only_report_path(monkeypatch, tmp_path: Path, capsys) -> None:
-    def fake_run_ping(host: str, count: int, timeout: int) -> PingResult:
-        return PingResult.from_rtt(host=host, count=count, timeout=timeout, rtt_values=[10.1, 12.3])
+    def fake_run_provider(name: str, **kwargs: object) -> PingResult:
+        assert name == "ping"
+        return PingResult.from_rtt(
+            host=str(kwargs["host"]),
+            count=int(kwargs["count"]),
+            timeout=int(kwargs["timeout"]),
+            rtt_values=[10.1, 12.3],
+        )
 
-    monkeypatch.setattr(cli_mod, "run_ping", fake_run_ping)
+    monkeypatch.setattr(cli_mod, "_run_provider", fake_run_provider)
 
     with pytest.raises(SystemExit) as exc_info:
         cli_mod.main(

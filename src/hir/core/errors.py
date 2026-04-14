@@ -25,3 +25,23 @@ class ReportExportError(HIRError):
 
 class CommandExecutionError(HIRError):
     """Raised when a delegated system command fails."""
+
+
+class PluginError(HIRError):
+    """Base exception for plugin and extension-system failures."""
+
+
+class PluginRegistrationError(PluginError):
+    """Raised when a plugin or capability cannot be registered."""
+
+
+class PluginCompatibilityError(PluginError):
+    """Raised when a plugin targets an incompatible HIR plugin API."""
+
+
+class PluginDiscoveryError(PluginError):
+    """Raised when plugin discovery fails in strict mode."""
+
+
+class PluginLookupError(PluginError):
+    """Raised when a required capability is not available in the registry."""
