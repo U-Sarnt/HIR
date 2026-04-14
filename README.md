@@ -6,6 +6,8 @@ HIR is an early-stage Python CLI for conservative network diagnostics and report
 
 HIR is a Python-first command-line tool for running a small set of common network diagnostics and exporting the resulting data. The current public contract is the validated CLI surface described in this README.
 
+Internally, HIR now also includes a conservative plugin and capability registry for acquisition, output handling, report loading, and enrichment. That foundation is meant to improve maintainability and future growth; it does not change the intentionally narrow public CLI.
+
 ## Project Philosophy
 
 - Conservative: HIR favors standard diagnostics, clear privilege requirements, and modest scope over aggressive scanning or broad claims.
@@ -26,18 +28,19 @@ HIR is a Python-first command-line tool for running a small set of common networ
 - `hir arp-scan` requires root privileges or equivalent raw-socket capabilities such as `CAP_NET_RAW` or `CAP_NET_ADMIN`.
 - Ping can export JSON, but HTML rendering is currently limited to traceroute and ARP reports.
 - ARP output may include vendor labels and operating system guesses, but those fields are not part of the validated diagnostic core.
+- The plugin foundation is currently aimed at maintainers and controlled extensions, not at a broad public plugin ecosystem.
 
 ## Experimental or Not Yet Guaranteed
 
 - Operating system identification is heuristic and should not be treated as validated fingerprinting.
 - MAC vendor enrichment is best-effort and may be unavailable depending on packaged data and local tooling.
-- Any workflow outside the validated CLI surface, including future packaging improvements, plugin work, or Rust-based acceleration, is not yet a guaranteed public path.
+- Any workflow outside the validated CLI surface, including third-party command plugins or Rust-based acceleration, is not yet a guaranteed public path.
 
 ## What HIR Is Not
 
 - HIR is not a replacement for mature network discovery, asset inventory, or vulnerability scanning suites.
 - HIR is not an aggressive scanner, stealth tool, or high-speed enumeration framework.
-- HIR is not yet a stable plugin platform or multi-language architecture.
+- HIR is not a broad plugin marketplace or multi-language architecture.
 
 ## Installation
 
@@ -111,6 +114,8 @@ hir report-export results/json/arp_scan_192_168_1_0_24_01.json
 - [docs/PHASE4_SUMMARY.md](docs/PHASE4_SUMMARY.md) records what phase 4 added and what quality debt remains.
 - [docs/CLI_OUTPUT_CONTRACTS.md](docs/CLI_OUTPUT_CONTRACTS.md) defines the stdout/stderr rules, exit codes, and versioned JSON contract.
 - [docs/PHASE5_SUMMARY.md](docs/PHASE5_SUMMARY.md) summarizes the CLI contract and output work completed in phase 5.
+- [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md) documents the current extensibility architecture and its deliberate limits.
+- [docs/PHASE6_SUMMARY.md](docs/PHASE6_SUMMARY.md) summarizes the plugin foundation added in phase 6.
 
 ## License
 

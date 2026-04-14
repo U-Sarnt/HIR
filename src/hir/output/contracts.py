@@ -22,7 +22,7 @@ def build_report_document(report: JsonReport) -> dict[str, Any]:
     return {
         "schema": REPORT_DOCUMENT_SCHEMA,
         "schema_version": REPORT_DOCUMENT_SCHEMA_VERSION,
-        "report_type": _report_type_for(report),
+        "report_type": report_type_for_report(report),
         "report": report.to_dict(),
     }
 
@@ -101,7 +101,7 @@ def _parse_report_payload(report_type: ReportType, payload: Mapping[str, Any]) -
     )
 
 
-def _report_type_for(report: JsonReport) -> ReportType:
+def report_type_for_report(report: JsonReport) -> ReportType:
     if isinstance(report, PingResult):
         return "ping"
     if isinstance(report, TracerouteResult):
