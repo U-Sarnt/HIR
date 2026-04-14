@@ -1,6 +1,9 @@
-import subprocess, pytest
-import hir.core.network as network
-from hir.core.network import OUI_DATABASE_UNAVAILABLE, get_vendor_from_mac, load_oui_database, os_fingerprint_nmap
+import subprocess
+
+import hir.core.vendor as vendor_mod
+from hir.core.fingerprint import os_fingerprint_nmap
+from hir.core.vendor import OUI_DATABASE_UNAVAILABLE, get_vendor_from_mac, load_oui_database
+
 
 class Dummy:
     stdout = "OS details: TestOS 1.0"
@@ -13,8 +16,8 @@ def test_nmap(monkeypatch):
 
 
 def reset_oui_cache():
-    network._OUI_DB = {}
-    network._OUI_DB_AVAILABLE = None
+    vendor_mod._OUI_DB = {}
+    vendor_mod._OUI_DB_AVAILABLE = None
 
 
 def test_vendor_lookup_reports_missing_oui_database():

@@ -1,9 +1,18 @@
+"""Ping collection and parsing helpers."""
+
+from __future__ import annotations
+
 import subprocess
 from collections.abc import Iterable, Iterator
-from typing import List, NamedTuple
+from typing import NamedTuple
+
+from hir.core.errors import CommandExecutionError, DependencyMissingError
+from hir.core.models import PingResult
 
 
 class PingReply(NamedTuple):
+    """A parsed ICMP reply line."""
+
     ttl: int | None
     time_ms: float | None
     time_text: str | None
@@ -62,26 +71,29 @@ def iter_ping_replies(lines: Iterable[str]) -> Iterator[PingReply]:
             yield reply
 
 
-def ping_host(host: str, count: int = 4, timeout: int = 2) -> List[float]:
-    """
-    Ejecuta `ping -c <count> -W <timeout> <host>` y devuelve la lista de tiempos (ms).
-    Lanza RuntimeError en caso de fallo.
-    """
+def ping_host(host: str, count: int = 4, timeout: int = 2) -> list[float]:
+    """Return the parsed RTT values for the target host."""
+    return list(run_ping(host, count=count, timeout=timeout).rtt_ms)
+
+
+def run_ping(host: str, count: int = 4, timeout: int = 2) -> PingResult:
+    """Run `ping` and return a structured result model."""
     cmd = build_ping_command(host, count=count, timeout=timeout)
 
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
     except FileNotFoundError as exc:
-        raise RuntimeError(
+        raise DependencyMissingError(
             "El comando 'ping' no está instalado o no está disponible en PATH."
         ) from exc
 
     if proc.returncode != 0:
         error = proc.stderr.strip() or proc.stdout.strip()
-        raise RuntimeError(f"ping falló ({host}): {error}")
+        raise CommandExecutionError(f"ping falló ({host}): {error}")
 
-    return [
+    rtt_values = [
         reply.time_ms
         for reply in iter_ping_replies(proc.stdout.splitlines())
         if reply.time_ms is not None
     ]
+    return PingResult.from_rtt(host=host, count=count, timeout=timeout, rtt_values=rtt_values)

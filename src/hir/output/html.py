@@ -1,6 +1,43 @@
-import os
+"""HTML report rendering helpers."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
 from datetime import datetime
+from pathlib import Path
+from typing import Any
+
 from jinja2 import Environment, PackageLoader, select_autoescape
+
+from hir.core.errors import ReportExportError
+from hir.core.models import ArpScanResult, TracerouteResult
+from hir.output.contracts import parse_supported_report_document
+from hir.output.files import build_output_path, finalize_output_path
+
+HtmlReport = Mapping[str, Any] | TracerouteResult | ArpScanResult
+
+
+def render_html(
+    data: HtmlReport,
+    base_filename: str | None = None,
+    directory: str | Path = "results/html",
+) -> str:
+    """Render a supported traceroute or ARP report to HTML."""
+    report = _coerce_html_report(data)
+    out_path = build_output_path(
+        directory,
+        base_filename=base_filename,
+        suffix=".html",
+        default_base_filename="report",
+    )
+
+    env = _create_template_environment()
+    template = env.get_template(_select_template_name(report))
+    rendered = template.render(**_build_template_context(report))
+
+    out_path.write_text(rendered, encoding="utf-8")
+    finalize_output_path(out_path)
+    return str(out_path)
 
 
 def _create_template_environment() -> Environment:
@@ -10,39 +47,32 @@ def _create_template_environment() -> Environment:
     )
 
 
-def _select_template_name(data: dict) -> str:
-    if "hops" in data:
+def _select_template_name(data: TracerouteResult | ArpScanResult) -> str:
+    if isinstance(data, TracerouteResult):
         return "traceroute_report.html.j2"
     return "arp_report.html.j2"
 
 
-def render_html(data: dict, base_filename: str = None, directory: str = "results/html") -> str:
-    os.makedirs(directory, exist_ok=True)
-    existing = [f for f in os.listdir(directory) if f.endswith('.html')]
-    idx = len(existing) + 1
-    filename = f"{base_filename}_{idx:02d}.html" if base_filename else f"report_{idx:02d}.html"
-    out_path = os.path.join(directory, filename)
+def _coerce_html_report(data: HtmlReport) -> TracerouteResult | ArpScanResult:
+    if isinstance(data, (TracerouteResult, ArpScanResult)):
+        return data
+    if isinstance(data, Mapping):
+        return parse_supported_report_document(dict(data))
+    raise ReportExportError("HTML export requires a traceroute or ARP report.")
 
-    env = _create_template_environment()
 
-    # Selección de plantilla
-    template = env.get_template(_select_template_name(data))
-    if "hops" in data:
-        rendered = template.render(host=data["host"], hops=data["hops"], timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    else:
-        rendered = template.render(subnet=data["subnet"], devices=data["devices"], timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+def _build_template_context(data: TracerouteResult | ArpScanResult) -> dict[str, Any]:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(data, TracerouteResult):
+        return {
+            "host": data.host,
+            "hops": [hop.to_tuple() for hop in data.hops],
+            "timestamp": timestamp,
+        }
 
-    with open(out_path, 'w', encoding='utf-8') as f:
-        f.write(rendered)
-
-    # Ajustar permisos y ownership si procede…
-    os.chmod(out_path, 0o644)
-    sudo_uid = os.environ.get("SUDO_UID")
-    sudo_gid = os.environ.get("SUDO_GID")
-    if sudo_uid and sudo_gid:
-        try:
-            os.chown(out_path, int(sudo_uid), int(sudo_gid))
-        except PermissionError:
-            pass
-
-    return out_path
+    return {
+        "subnet": data.subnet,
+        "devices": [device.to_dict() for device in data.devices],
+        "timestamp": timestamp,
+        "os_note": data.os_note,
+    }

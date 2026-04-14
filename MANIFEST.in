@@ -1,1 +1,9 @@
-recursive-include src/hir/output/templates *.j2
+graft docs
+graft tests
+graft src/hir/output/templates
+prune .venv
+prune build
+prune dist
+prune results
+prune .pytest_cache
+global-exclude __pycache__ *.py[cod]

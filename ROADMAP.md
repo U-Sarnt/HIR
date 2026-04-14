@@ -1,136 +1,99 @@
-# HIR — Roadmap & Improvement Plan
+# HIR Roadmap
 
-This document tracks known issues, technical debt, and the improvement plan to take HIR from its current early-stage state to a production-quality tool.
+This roadmap describes the intended sequence for professionalizing HIR. The project is currently an early-stage Python CLI with a deliberately narrow public scope centered on `ping`, `traceroute`, `arp-scan`, and `report-export`.
 
----
+The ordering matters. Packaging, testing, architecture, and consistency come before broad feature expansion.
 
-## Current state (as of March 2026)
+## Direction
 
-HIR is a functional early-stage Python CLI for basic network diagnostics. It covers ping, traceroute, ARP scan, MAC vendor lookup, and heuristic OS estimation. The core loop works, but the codebase has significant gaps before it can be considered reliable or extensible.
+- Keep HIR Python-first until the current CLI surface is reliable, testable, and consistently documented.
+- Treat documentation accuracy, installation correctness, and repository hygiene as foundation work rather than optional polish.
+- Distinguish validated diagnostics from heuristic enrichment in both code and public messaging.
+- Expand scope only when the existing workflow is stable on a clean environment.
 
-**Honest score: 55 / 100**
+## Phase 1: Foundation Work
 
----
+Goal: establish a consistent and professional public identity for the repository.
 
-## Known problems
+Focus areas:
 
-### Critical
+- make `README.md` the public source of truth for scope, limits, and usage
+- align `ROADMAP.md`, `CONTRIBUTING.md`, and `SECURITY.md` with the real project state
+- clean repository hygiene so local environments and generated artifacts are not tracked
+- align package metadata and repository-facing language with the validated Python CLI
+- remove or stop implying unsupported public promises
 
-| # | Problem | Location | Impact |
-|---|---------|----------|--------|
-| 1 | `src/cli.py` is empty (0 bytes) | `src/cli.py` | Anyone who clones the repo gets a broken install |
-| 2 | `src/rust_ext.py` is empty (0 bytes) | `src/rust_ext.py` | Import will succeed but do nothing — silent failure |
-| 3 | `Cargo.toml` is empty (0 bytes) | `Cargo.toml` | Implies Rust support that does not exist yet |
-| 4 | `Dockerfile` is empty (0 bytes) | `Dockerfile` | Implies containerization that does not exist yet |
+## Phase 2: Reliability Work
 
-### Documentation & consistency
+Goal: make the validated workflow dependable on a fresh setup.
 
-| # | Problem | Impact |
-|---|---------|--------|
-| 5 | Topics include `rust` and `pyo3` but README states Rust is not in use | Misleads visitors about the actual stack |
-| 6 | All 5 recent commits are in Spanish (`fase 1` through `fase 5`) while the rest of the profile uses English | Inconsistent, looks unprofessional on an English-language profile |
-| 7 | Commit author email is `thxsanti@gmail.com` instead of `u.sarnt@proton.me` | Does not match public contact info |
-| 8 | No badges in README (CI status, Python version, license) | Visitors cannot tell at a glance whether the project is healthy |
+Focus areas:
 
-### Code quality
+- verify that editable installation and CLI entry points work cleanly on a new Linux environment
+- strengthen automated tests around the validated commands and export paths
+- ensure packaged templates and supporting data are included and behave predictably
+- document platform assumptions, privilege requirements, and failure modes clearly
+- separate validated output from optional or heuristic enrichment more cleanly
 
-| # | Problem | Impact |
-|---|---------|--------|
-| 9 | No type hints in source files | Harder to maintain and understand |
-| 10 | No docstrings in public functions | No inline documentation |
-| 11 | OS fingerprinting is heuristic with no stated accuracy | Could mislead users who rely on the output |
-| 12 | ARP scan requires root/sudo but this is not communicated clearly in the CLI output | Confusing UX when permissions are missing |
-| 13 | `rust_ext/` directory exists but contains no Rust code | Dead weight, confuses the project structure |
+Exit criteria:
 
----
+- a clean install can run `hir --help` and the documented command help paths
+- the automated test suite covers the validated surface with confidence
+- documentation and CI reflect the same supported workflow
 
-## Improvement plan
+## Phase 3: UX Work
 
-Organised by priority. Each tier builds on the previous one.
+Goal: improve operator experience without widening scope prematurely.
 
----
+Focus areas:
 
-### Tier 1 — Fix what is broken (this week)
+- make public CLI language and documentation consistently professional and clear
+- improve error handling, help text, and exit behavior for common failure cases
+- tighten output naming, report ergonomics, and validation examples
+- reduce ambiguity around experimental fields and unsupported workflows
 
-These are blockers. Nothing else matters until these are done.
+Exit criteria:
 
-- [ ] **Fill `src/cli.py`** with the actual CLI entry point using `argparse` or `click`.
-- [ ] **Fill `src/rust_ext.py`** with a proper stub or remove it entirely until Rust is actually implemented.
-- [ ] **Delete or fill `Cargo.toml`** — if Rust is not planned short-term, delete it. If it is, add the workspace definition.
-- [ ] **Delete or fill `Dockerfile`** — a minimal working Dockerfile takes 10 lines. Either write it or remove it.
-- [ ] **Fix topics** — remove `rust` and `pyo3`, replace with `networking`, `cli`, `network-diagnostics`, `scapy`.
-- [ ] **Add README badges** — at minimum: CI status, Python version, license.
+- a new user can install HIR, run the validated commands, and understand the limits without reading the source
 
-```
-git config --global user.email "u.sarnt@proton.me"
-```
+## Phase 4: Network Feature Expansion
 
----
+Goal: expand capabilities cautiously after the existing baseline is stable.
 
-### Tier 2 — Make it installable and testable (next 2 weeks)
+Focus areas:
 
-- [ ] **Publish a working `pip install`** — verify `pip install -e .` produces a usable CLI command with `hir --help`.
-- [ ] **Write real unit tests** — at minimum test ping parsing, traceroute parsing, and ARP result structure. Aim for >60% coverage.
-- [ ] **Add CI badge that actually passes** — a green CI badge on the README is worth more than any amount of documentation.
-- [ ] **Fix all commit messages going forward** — use conventional commits in English: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`.
-- [ ] **Add type hints** to all public functions in `src/hir/`.
-- [ ] **Add docstrings** to all public functions.
+- add new diagnostics or report types only when they fit the conservative CLI model
+- improve structured output and report coverage incrementally
+- introduce additional network discovery features only with clear validation boundaries
 
----
+Guardrails:
 
-### Tier 3 — Make it useful beyond basic diagnostics (1 month)
+- no feature expansion that outpaces packaging, tests, or documentation
+- every new public command should define prerequisites, privilege requirements, and supported outputs
 
-This is where HIR stops being a practice project and starts being something others would actually use.
+## Phase 5: Plugin and Rust Work
 
-- [ ] **Structured output** — add `--format json` flag so results can be piped to other tools.
-- [ ] **Host discovery mode** — scan a CIDR range and return live hosts with MAC, vendor, and estimated OS in a table.
-- [ ] **Port scan integration** — lightweight TCP connect scan on common ports (no nmap dependency required).
-- [ ] **HTML report improvements** — make the exported report self-contained (inline CSS/JS), with timestamps and scan metadata.
-- [ ] **Proper permission handling** — detect when ARP scan is run without root and show a clear, actionable error instead of a traceback.
-- [ ] **`--timeout` and `--retries` flags** — currently hardcoded or missing; expose them as CLI options.
-- [ ] **OUI database bundled with the package** — do not depend on an external file being present; ship a compressed OUI database as a package resource.
+Goal: evaluate extensibility and performance work after the Python core is mature enough to justify it.
 
----
+Focus areas:
 
-### Tier 4 — Production quality (2–3 months)
+- define whether a plugin model is actually needed and what stability guarantees it would require
+- measure real performance bottlenecks before proposing Rust acceleration
+- treat Rust or plugin work as optional, later-stage engineering decisions rather than current branding
 
-This tier turns HIR into a tool that a security engineer would reach for on the job.
+Guardrails:
 
-- [ ] **Rust extension (optional but powerful)** — implement the ping/traceroute parsing in Rust via PyO3 for measurable performance on large scans. This would justify the `rust` topic and `rust_ext/` directory.
-- [ ] **Async scan engine** — replace sequential host scanning with `asyncio` for parallel execution. This makes a meaningful difference at /24 and larger.
-- [ ] **Plugin architecture** — allow users to register custom scan modules without forking the project.
-- [ ] **`--diff` mode** — compare two scan results and highlight new/missing hosts or changed ports. Useful for network monitoring.
-- [ ] **Publish to PyPI** — a proper `pip install hir` with versioned releases.
-- [ ] **Docker image** — a working `Dockerfile` that produces a container with all dependencies pre-installed, including those that require root (Scapy, raw sockets).
-- [ ] **Man page / shell completions** — generated via `click` or `argparse` for a professional CLI experience.
+- do not market plugin or Rust support before design, packaging, and maintenance expectations are clear
+- keep the Python CLI as the validated public path until a broader architecture is proven
 
----
+## Sequence Summary
 
-### Tier 5 — Stand-out features (ongoing)
+1. Foundation work
+2. Reliability work
+3. UX work
+4. Network feature expansion
+5. Plugin and Rust work
 
-Features that would make HIR genuinely notable in the Python networking tool space.
+## Contribution Alignment
 
-- [ ] **CVE correlation** — cross-reference discovered services/versions against a local NVD snapshot.
-- [ ] **Timeline view** — store scan history locally (SQLite) and show how the network has changed over time.
-- [ ] **Web UI mode** — `hir serve` starts a local web dashboard showing live scan results and history.
-- [ ] **Integration with Aegis-Agent** — HIR discovering a host could trigger an Aegis-Agent scan of that host's exposed configuration endpoints.
-
----
-
-## Success metrics
-
-How to know HIR has reached each tier:
-
-| Tier | Signal |
-|------|--------|
-| 1 | `pip install -e . && hir --help` works without errors |
-| 2 | CI is green, coverage >60%, `pip install hir` installs a working tool |
-| 3 | A person unfamiliar with the project can run a subnet scan and get structured JSON output in under 5 minutes |
-| 4 | The tool is published on PyPI with a versioned release and a working Docker image |
-| 5 | HIR appears in search results for Python network diagnostic tools |
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions should target an open issue or create one first.
+Contributions should match the current phase priorities. For the present workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
